@@ -4,6 +4,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// CI 发布签名：从环境变量读取（GitHub Actions Secrets），本地未配置时回退 debug 签名
+val ciKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+val ciKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+val ciKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+val ciKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+val hasCiSigning = !ciKeystorePath.isNullOrBlank() &&
+    !ciKeystorePassword.isNullOrBlank() &&
+    !ciKeyAlias.isNullOrBlank() &&
+    !ciKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.shiyi.shiyi"
     compileSdk = flutter.compileSdkVersion
@@ -29,11 +39,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasCiSigning) {
+            create("release") {
+                storeFile = file(ciKeystorePath)
+                storePassword = ciKeystorePassword
+                keyAlias = ciKeyAlias
+                keyPassword = ciKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasCiSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                // 未配置正式密钥时用 debug 签名（本地开发 / CI 无 Secrets 场景）
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
