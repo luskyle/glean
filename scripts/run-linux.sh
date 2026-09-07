@@ -16,7 +16,8 @@ if [ ! -x "$DIST/shiyi" ]; then
 fi
 
 export DISPLAY="${DISPLAY:-:0}"
-# 无 GPU/vsync 会话下强制软件渲染，避免 EGL 初始化警告
-export LIBGL_ALWAYS_SOFTWARE=1
+# NVIDIA 专有驱动：强制 glvnd 使用 nvidia EGL vendor（否则 libEGL 会落到
+# mesa 的 DRI2 路径，对 nvidia_drm 无法认证 → 软件渲染，CPU 高占用）
+export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
 cd "$DIST"
 exec ./shiyi "$@"
