@@ -1,0 +1,308 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'data/database/database.dart';
+import 'data/dictionary/dictionary_service.dart';
+import 'data/repositories/item_repository.dart';
+import 'data/repositories/review_repository.dart';
+import 'data/settings/settings_store.dart';
+import 'domain/srs/sm2.dart';
+import 'domain/tagging/language.dart';
+
+/// 数据库（测试中可 override 为内存库）。
+final databaseProvider = Provider<AppDatabase>((ref) {
+  final db = AppDatabase.open();
+  ref.onDispose(db.close);
+  return db;
+});
+
+/// 设置存储（测试中可 override）。
+final settingsProvider = Provider<SettingsStore>((ref) {
+  throw UnimplementedError('settingsProvider must be overridden in tests or '
+      'initialized in main() via settingsStoreProvider');
+});
+
+/// 由 main() 注入的 SharedPreferences 实例。
+final sharedPrefsProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError('sharedPrefsProvider must be overridden in main()');
+});
+
+final itemRepositoryProvider = Provider<ItemRepository>((ref) {
+  return ItemRepository(ref.watch(databaseProvider));
+});
+
+final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
+  return ReviewRepository(ref.watch(databaseProvider));
+});
+
+final dictionaryServiceProvider = Provider<DictionaryService>((ref) {
+  return const DictionaryService();
+});
+
+// ---------------------------------------------------------------------------
+// 收件箱 / 记忆库
+// ---------------------------------------------------------------------------
+
+/// 收件箱流（待归类 + 待学习）。
+final inboxItemsProvider = StreamProvider<List<ItemWithCard>>((ref) {
+  return ref.watch(itemRepositoryProvider).watchInbox();
+});
+
+/// 记忆库筛选参数。
+class LibraryFilter {
+  const LibraryFilter({this.search = '', this.lang, this.status});
+
+  final String search;
+  final String? lang;
+  final String? status;
+
+  LibraryFilter copyWith({String? search, String? lang, String? status}) {
+    return LibraryFilter(
+      search: search ?? this.search,
+      lang: lang ?? this.lang,
+      status: status ?? this.status,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is LibraryFilter &&
+      other.search == search &&
+      other.lang == lang &&
+      other.status == status;
+
+  @override
+  int get hashCode => Object.hash(search, lang, status);
+}
+
+final libraryFilterProvider = StateProvider<LibraryFilter>((ref) {
+  return const LibraryFilter();
+});
+
+final libraryItemsProvider = StreamProvider<List<ItemWithCard>>((ref) {
+  final filter = ref.watch(libraryFilterProvider);
+  return ref.watch(itemRepositoryProvider).watchLibrary(
+        search: filter.search,
+        lang: filter.lang,
+        status: filter.status,
+      );
+});
+
+final collectionsProvider = FutureProvider<List<CollectionRow>>((ref) {
+  return ref.watch(itemRepositoryProvider).collections();
+});
+
+/// 条目-库 多对多关系流（记忆库分组用）。
+final itemCollectionLinksProvider =
+    StreamProvider<List<ItemCollectionRow>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.select(db.itemCollections).watch();
+});
+
+final collectionStatsProvider =
+    FutureProvider<Map<int, ({int total, int mastered})>>((ref) {
+  return ref.watch(itemRepositoryProvider).collectionStats();
+});
+
+// ---------------------------------------------------------------------------
+// 复习
+// ---------------------------------------------------------------------------
+
+/// 今日复习任务卡片（到期队列）。
+final dueCardsProvider = FutureProvider<List<CardWithItem>>((ref) async {
+  return ref.watch(reviewRepositoryProvider).dueCards();
+});
+
+/// 今日任务数 / 积压 / 已复习 / 掌握率（复习页头部数据）。
+final reviewOverviewProvider = FutureProvider<ReviewOverview>((ref) async {
+  final repo = ref.watch(reviewRepositoryProvider);
+  final now = DateTime.now();
+  final due = await repo.dueCount(now);
+  final backlog = await repo.backlogCount(now);
+  final reviewedToday = await repo.reviewsToday(now);
+  final masterRatio = await repo.masterRatio();
+  return ReviewOverview(
+    due: due,
+    backlog: backlog,
+    reviewedToday: reviewedToday,
+    masterRatio: masterRatio,
+  );
+});
+
+class ReviewOverview {
+  const ReviewOverview({
+    required this.due,
+    required this.backlog,
+    required this.reviewedToday,
+    required this.masterRatio,
+  });
+
+  final int due;
+  final int backlog;
+  final int reviewedToday;
+  final double masterRatio;
+}
+
+/// 周视图曲线数据。
+final weeklyStatsProvider = FutureProvider<List<WeeklyStat>>((ref) {
+  return ref.watch(reviewRepositoryProvider).weeklyStats();
+});
+
+/// 今日复习进度（已答/总数），复习会话开始时建立。
+final reviewSessionProvider =
+    StateProvider<ReviewSessionState?>((ref) => null);
+
+class ReviewSessionState {
+  const ReviewSessionState({
+    required this.total,
+    required this.answered,
+    required this.qualitySum,
+  });
+
+  final int total;
+  final int answered;
+  final int qualitySum;
+}
+
+// ---------------------------------------------------------------------------
+// 免费额度 / 订阅
+// ---------------------------------------------------------------------------
+
+class QuotaState {
+  const QuotaState({
+    required this.isPro,
+    required this.libraryCards,
+    required this.reviewsToday,
+  });
+
+  final bool isPro;
+  final int libraryCards;
+  final int reviewsToday;
+
+  bool get libraryFull => !isPro && libraryCards >= Quota.maxLibraryCards;
+
+  bool get dailyReviewFull => !isPro && reviewsToday >= Quota.maxDailyReviews;
+}
+
+final quotaProvider = FutureProvider<QuotaState>((ref) async {
+  final settings = ref.watch(settingsProvider);
+  final itemRepo = ref.watch(itemRepositoryProvider);
+  final reviewRepo = ref.watch(reviewRepositoryProvider);
+  final now = DateTime.now();
+  final results = await Future.wait<int>([
+    itemRepo.cardCount(),
+    reviewRepo.reviewsToday(now),
+  ]);
+  return QuotaState(
+    isPro: settings.isPro,
+    libraryCards: results[0],
+    reviewsToday: results[1],
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 剪贴板监听
+// ---------------------------------------------------------------------------
+
+/// 剪贴板指纹（去重提示用，源码不含可供理解的内容）。
+String clipboardFingerprint(String text) {
+  final t = text.trim();
+  if (t.length > 200) return t.substring(0, 200);
+  return t;
+}
+
+/// 剪贴板监听开关（UI 状态，初始化自设置；切换即时启停监听）。
+final clipboardWatchEnabledProvider = StateProvider<bool>((ref) {
+  return ref.watch(settingsProvider).clipboardWatchEnabled;
+});
+
+/// 剪贴板轮询器：App 前台时每 4s 检查一次（可关闭）。
+/// 有新的可收藏文本 → 通过 [onCapture] 回调通知 UI 弹轻提示。
+class ClipboardWatcher {
+  ClipboardWatcher({
+    required this.readClipboard,
+    required this.onCapture,
+  });
+
+  /// 读取剪贴板文本（注入以便测试）。
+  final Future<String?> Function() readClipboard;
+  final void Function(String text) onCapture;
+
+  Timer? _timer;
+  String? _lastHandled;
+  bool _enabled = false;
+
+  void start() {
+    if (_enabled) return;
+    _enabled = true;
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _poll());
+  }
+
+  void stop() {
+    _enabled = false;
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  Future<void> _poll() async {
+    final text = await readClipboard();
+    if (text == null || text.trim().isEmpty) return;
+    final fp = clipboardFingerprint(text);
+    if (fp == _lastHandled) return;
+    if (fp.length < 2 || fp.length > 2000) return;
+    _lastHandled = fp;
+    onCapture(text.trim());
+  }
+
+  void markHandled(String text) {
+    _lastHandled = clipboardFingerprint(text);
+  }
+
+  void dispose() => stop();
+}
+
+// ---------------------------------------------------------------------------
+// 语言标签帮助函数
+// ---------------------------------------------------------------------------
+
+String languageLabel(ContentLang lang) {
+  return switch (lang) {
+    ContentLang.ja => '日语',
+    ContentLang.zh => '中文',
+    ContentLang.en => '英语',
+    ContentLang.other => '其他',
+  };
+}
+
+/// 中文状态文案（列表徽标用）。
+String statusLabel(String status) {
+  return switch (status) {
+    'inbox' => '待归类',
+    'learning' => '学习中',
+    'mastered' => '已掌握',
+    'cold' => '冷置',
+    _ => status,
+  };
+}
+
+Color statusColor(String status) {
+  return switch (status) {
+    'inbox' => Colors.blueGrey,
+    'learning' => Colors.teal,
+    'mastered' => Colors.green,
+    'cold' => Colors.orange,
+    _ => Colors.blueGrey,
+  };
+}
+
+/// 三键评级 UI 文案。
+String ratingLabel(ReviewRating r) {
+  return switch (r) {
+    ReviewRating.forgot => '忘了',
+    ReviewRating.fuzzy => '模糊',
+    ReviewRating.remembered => '记得',
+  };
+}

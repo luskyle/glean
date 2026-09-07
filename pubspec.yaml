@@ -1,0 +1,35 @@
+name: shiyi
+description: 拾忆 —— 把你想记住的任何东西收进来，它会在对的时间提醒你复习。
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  # 状态管理（技术调研选型：Riverpod）
+  flutter_riverpod: ^2.6.1
+  # 本地存储（drift/SQLite）
+  drift: ^2.28.0
+  drift_flutter: ^0.2.4
+  # 图表（遗忘曲线 / 热力图）
+  fl_chart: ^1.1.1
+  # 设置 KV 与轻量缓存
+  shared_preferences: ^2.5.3
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.28.0
+  build_runner: ^2.4.15
+
+flutter:
+  uses-material-design: true
