@@ -3,6 +3,8 @@
 > 把你想记住的任何东西——单词、摘抄、灵感、考纲——划进收件箱，
 > App 用间隔重复（SM-2）自动安排复习，直到你真正记住。
 
+**官网**：<https://luskyle.github.io/shiyi/>　｜　[![官网](https://img.shields.io/badge/%E6%8B%BE%E5%BF%86-%E5%AE%98%E7%BD%91-2F6BFF?style=flat-square)](https://luskyle.github.io/shiyi/)
+
 依据《拾忆App架构设计》《开发计划-分阶段功能路线》《技术调研-核心技术选型》
 （vpub/docs/强化记忆）实现的 **MVP 初版**（对应里程碑 M0 ~ 阶段 1 核心闭环）。
 
@@ -61,7 +63,12 @@ flutter run
 - `.github/workflows/release.yml`：推送 `v*` 标签（或手动 workflow_dispatch 指定 tag）→
   质量门禁 → 构建 Android APK / Linux tar.gz / iOS 未签名包 → 自动生成中文发布说明 →
   发布 GitHub Release（含全部产物；重复触发自动更新）
+- `.github/workflows/pages.yml`：docs/ 静态官网自动部署 GitHub Pages（https://luskyle.github.io/shiyi/）
 - 发布说明由 `scripts/gen_release_notes.sh` 从 git log 按 Conventional Commits 分组生成
+
+一次性设置（GitHub 网页操作）：
+- **GitHub Pages**：Settings → Pages → Source 选 **GitHub Actions**（官网由 pages.yml 自动部署）
+- **仓库简介 Website**：仓库右栏 About → ⚙ → Website 填 `https://luskyle.github.io/shiyi/`
 
 发布前需在仓库配置（可选）：
 - GitHub Secrets（Android 正式签名，缺省时自动回退 debug 签名发布）：
