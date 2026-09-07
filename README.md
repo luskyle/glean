@@ -55,6 +55,24 @@ flutter run
 > 平台说明：本项目数据层使用 drift/SQLite（`dart:ffi`），**不支持 Web 编译**
 > （路线图亦未包含 Web；V2 目标是 Windows/macOS 桌面端）。
 
+## CI / CD（GitHub Actions）
+
+- `.github/workflows/ci.yml`：main 分支 push / PR → `flutter analyze` + `flutter test`（质量门禁）
+- `.github/workflows/release.yml`：推送 `v*` 标签（或手动 workflow_dispatch 指定 tag）→
+  质量门禁 → 构建 Android APK / Linux tar.gz / iOS 未签名包 → 自动生成中文发布说明 →
+  发布 GitHub Release（含全部产物；重复触发自动更新）
+- 发布说明由 `scripts/gen_release_notes.sh` 从 git log 按 Conventional Commits 分组生成
+
+发布前需在仓库配置（可选）：
+- GitHub Secrets（Android 正式签名，缺省时自动回退 debug 签名发布）：
+  `ANDROID_KEYSTORE`(base64 的 .jks) / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`
+- iOS 正式发布需 Apple 证书（当前产出未签名包）
+
+```bash
+# 出包：打标签即触发（版本号与 pubspec.version 保持一致）
+git tag v0.2.0 && git push origin v0.2.0
+```
+
 ## 测试
 
 - `test/domain/sm2_test.dart`：SM-2 引擎 20+ 用例（忘记/模糊/记得、间隔边界、
