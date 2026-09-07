@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// 拾忆主题：Material 3，冷静的青色（记忆/时间感），低饱和。
+/// 拾忆主题：Material 3，参考 Cubox 的蓝色基调（收藏/工具语义）。
 class AppTheme {
-  static const Color seed = Color(0xFF2E7D6B);
+  static const Color seed = Color(0xFF2F6BFF);
 
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(seedColor: seed);
@@ -34,8 +34,13 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: scheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        color: scheme.surface,
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

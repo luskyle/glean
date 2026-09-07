@@ -8,11 +8,16 @@ import '../../shared/status_chip.dart';
 import 'item_actions.dart';
 
 /// 收件箱：待归类 + 待学习条目，收藏时间倒序。
+///
+/// [active]：非活动 Tab 时 build 短路，停止构建与流监听（减少后台开销）。
 class InboxScreen extends ConsumerWidget {
-  const InboxScreen({super.key});
+  const InboxScreen({super.key, this.active = true});
+
+  final bool active;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!active) return const SizedBox.shrink();
     final items = ref.watch(inboxItemsProvider);
 
     return items.when(

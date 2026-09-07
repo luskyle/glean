@@ -10,8 +10,12 @@ import '../inbox/item_actions.dart';
 
 /// 记忆库：全部成卡的管理视图。
 /// 搜索（全文）/ 筛选（语言、状态）/ 分组（库 + 未分类兜底）。
+///
+/// [active]：非活动 Tab 时 build 短路，停止构建与流监听（减少后台开销）。
 class LibraryScreen extends ConsumerStatefulWidget {
-  const LibraryScreen({super.key});
+  const LibraryScreen({super.key, this.active = true});
+
+  final bool active;
 
   @override
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
@@ -28,6 +32,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.active) return const SizedBox.shrink();
+
     final filter = ref.watch(libraryFilterProvider);
     final items = ref.watch(libraryItemsProvider);
     final collections = ref.watch(collectionsProvider);
@@ -141,9 +147,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _setLang(String l) {
-    final f = ref.read(libraryFilterProvider);
     ref.read(libraryFilterProvider.notifier).state =
-        f.copyWith(lang: f.lang == l ? null : l);
+        ref.read(libraryFilterProvider).toggleLang(l);
   }
 
   Widget _groupedList(

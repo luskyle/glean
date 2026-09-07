@@ -9,14 +9,15 @@ import '../library/library_screen.dart';
 import '../review/curve_screen.dart';
 import '../review/review_screen.dart';
 import '../settings/settings_screen.dart';
+import 'desktop_sidebar.dart';
 
 /// 当前 Tab（默认落点 = 复习页，见设计原则 2）。
 final homeTabIndexProvider = StateProvider<int>((ref) => 1);
 
-/// 三 Tab 外壳：收件箱 / 复习（默认）/ 记忆库。
+/// 外壳：Cubox 式响应式布局。
 ///
-/// - IndexedStack 保状态（切 Tab 不重建）
-/// - 全局共享元素：右上角"+"（收件箱）、搜索（跳记忆库）、底部三 Tab
+/// - 宽屏（>= 900，桌面）：左侧收藏箱侧栏 + 顶栏搜索 + 内容区（IndexedStack 保状态）
+/// - 窄屏（移动）：底部三 Tab + 右上角"+"，与原设计一致
 /// - 剪贴板监听（前台轮询，可设置关闭）→ 轻提示"有内容要收藏？"
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
@@ -27,6 +28,10 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   static const _titles = ['收件箱', '今日复习', '记忆库'];
+  static const _wideBreakpoint = 900.0;
+
+  /// 顶栏全局搜索框控制器（宽屏）。
+  final _searchCtrl = TextEditingController();
 
   ClipboardWatcher? _watcher;
 
@@ -45,6 +50,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _watcher?.dispose();
     _watcher = null;
     super.dispose();
@@ -88,7 +94,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final tabIndex = ref.watch(homeTabIndexProvider);
-    final isInbox = tabIndex == 0;
 
     // 设置里切换剪贴板监听 → 即时启停轮询
     ref.listen(clipboardWatchEnabledProvider, (prev, next) {
@@ -98,6 +103,127 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         _watcher?.stop();
       }
     });
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= _wideBreakpoint) {
+          return _buildWide(context, tabIndex);
+        }
+        return _buildNarrow(context, tabIndex);
+      },
+    );
+  }
+
+  // ---- 宽屏（Cubox 式）----
+
+  Widget _buildWide(BuildContext context, int tabIndex) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Row(
+        children: [
+          DesktopSidebar(
+            activeTab: tabIndex,
+            onSelectTab: (i) =>
+                ref.read(homeTabIndexProvider.notifier).state = i,
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(
+            child: Column(
+              children: [
+                _buildTopBar(context, scheme, tabIndex),
+                const Divider(height: 1),
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1280),
+                      child: IndexedStack(
+                        index: tabIndex,
+                        children: [
+                          InboxScreen(active: tabIndex == 0),
+                          ReviewScreen(active: tabIndex == 1),
+                          LibraryScreen(active: tabIndex == 2),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context, ColorScheme scheme, int tabIndex) {
+    return Container(
+      color: scheme.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 320,
+            child: TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: '搜索记忆库…',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchCtrl.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          ref.read(libraryFilterProvider.notifier).state =
+                              ref.read(libraryFilterProvider).copyWith(search: '');
+                        },
+                      ),
+                isDense: true,
+                filled: true,
+                fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              onChanged: (v) {
+                // 输入即切到记忆库并搜索
+                if (tabIndex != 2) {
+                  ref.read(homeTabIndexProvider.notifier).state = 2;
+                }
+                ref.read(libraryFilterProvider.notifier).state =
+                    ref.read(libraryFilterProvider).copyWith(search: v);
+              },
+            ),
+          ),
+          const Spacer(),
+          if (tabIndex == 1)
+            IconButton(
+              tooltip: '遗忘曲线',
+              icon: const Icon(Icons.show_chart),
+              onPressed: () => _openCurve(),
+            ),
+          IconButton(
+            tooltip: '新建收藏',
+            icon: const Icon(Icons.add),
+            onPressed: () => _openAddSheet(),
+          ),
+          IconButton(
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => _openSettings(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---- 窄屏（移动三 Tab）----
+
+  Widget _buildNarrow(BuildContext context, int tabIndex) {
+    final isInbox = tabIndex == 0;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -126,15 +252,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       body: IndexedStack(
         index: tabIndex,
-        children: const [
-          InboxScreen(),
-          ReviewScreen(),
-          LibraryScreen(),
+        children: [
+          InboxScreen(active: tabIndex == 0),
+          ReviewScreen(active: tabIndex == 1),
+          LibraryScreen(active: tabIndex == 2),
         ],
       ),
       floatingActionButton: isInbox
           ? FloatingActionButton.extended(
               onPressed: () => _openAddSheet(),
+              backgroundColor: scheme.primary,
+              foregroundColor: scheme.onPrimary,
               icon: const Icon(Icons.add),
               label: const Text('收藏'),
             )

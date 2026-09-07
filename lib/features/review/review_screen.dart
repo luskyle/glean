@@ -7,11 +7,16 @@ import 'curve_screen.dart';
 import 'review_session_screen.dart';
 
 /// 复习页（默认落点）：今日任务 + 开始复习 + 遗忘曲线入口。
+///
+/// [active]：非活动 Tab 时 build 短路，停止构建与统计监听（减少后台开销）。
 class ReviewScreen extends ConsumerWidget {
-  const ReviewScreen({super.key});
+  const ReviewScreen({super.key, this.active = true});
+
+  final bool active;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!active) return const SizedBox.shrink();
     final overview = ref.watch(reviewOverviewProvider);
     final scheme = Theme.of(context).colorScheme;
 

@@ -70,4 +70,37 @@ void main() {
     expect(find.widgetWithText(FilledButton, '开始复习'), findsNothing);
     expect(find.text('今天还没有复习任务'), findsOneWidget);
   });
+
+  testWidgets('宽屏显示 Cubox 式侧栏布局', (tester) async {
+    final container = await buildTestContainer();
+    addTearDown(container.dispose);
+
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const ShiyiApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 侧栏元素：Logo / 新建收藏 / 分组
+    expect(find.text('新建收藏'), findsOneWidget);
+    expect(find.text('今日复习'), findsOneWidget);
+    expect(find.text('分组'), findsOneWidget);
+
+    // 窄屏三 Tab 不再渲染
+    expect(find.byType(NavigationBar), findsNothing);
+    // 仍显示复习页默认落点内容
+    expect(find.text('今天还没有复习任务'), findsOneWidget);
+
+    // 侧栏切到记忆库
+    await tester.tap(find.text('记忆库'));
+    await tester.pumpAndSettle();
+    expect(find.text('记忆库还空着'), findsOneWidget);
+  });
 }

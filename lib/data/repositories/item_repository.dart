@@ -211,14 +211,20 @@ class ItemRepository {
         .toList();
   }
 
-  /// 记忆库流：全部成卡条目 + 可选搜索/筛选。
+  /// 记忆库流：全部成卡条目 + 可选搜索/筛选/按主库过滤。
   Stream<List<ItemWithCard>> watchLibrary({
     String search = '',
     String? lang,
     String? status,
+    int? collectionId,
   }) {
     final q = db.select(db.items).join([
       leftOuterJoin(db.cards, db.cards.id.equalsExp(db.items.cardId)),
+      if (collectionId != null)
+        innerJoin(
+          db.itemCollections,
+          db.itemCollections.itemId.equalsExp(db.items.id),
+        ),
     ])
       ..where(db.items.cardId.isNotNull())
       ..orderBy([OrderingTerm.desc(db.items.createdAt)]);
@@ -236,6 +242,10 @@ class ItemRepository {
     }
     if (status != null && status.isNotEmpty) {
       where(db.items.status.equals(status));
+    }
+    if (collectionId != null) {
+      where(db.itemCollections.collectionId.equals(collectionId) &
+          db.itemCollections.isPrimary.equals(true));
     }
 
     return q.watch().map(_mapItemWithCard);

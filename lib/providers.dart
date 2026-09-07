@@ -53,29 +53,57 @@ final inboxItemsProvider = StreamProvider<List<ItemWithCard>>((ref) {
 
 /// 记忆库筛选参数。
 class LibraryFilter {
-  const LibraryFilter({this.search = '', this.lang, this.status});
+  const LibraryFilter({this.search = '', this.lang, this.status, this.collectionId});
 
   final String search;
   final String? lang;
   final String? status;
 
-  LibraryFilter copyWith({String? search, String? lang, String? status}) {
+  /// 按库（主库）过滤，null = 全部。
+  final int? collectionId;
+
+  LibraryFilter copyWith({String? search, String? lang, String? status, int? collectionId}) {
     return LibraryFilter(
       search: search ?? this.search,
       lang: lang ?? this.lang,
       status: status ?? this.status,
+      collectionId: collectionId ?? this.collectionId,
     );
   }
+
+  /// 切换语言筛选（再点一次取消）。
+  LibraryFilter toggleLang(String l) {
+    return LibraryFilter(
+      search: search,
+      lang: lang == l ? null : l,
+      status: status,
+      collectionId: collectionId,
+    );
+  }
+
+  /// 切到指定分组（null = 全部）。
+  LibraryFilter withCollection(int? id) {
+    return LibraryFilter(
+      search: search,
+      lang: lang,
+      status: status,
+      collectionId: id,
+    );
+  }
+
+  /// 清空（切回"全部"视图）。
+  LibraryFilter reset() => const LibraryFilter();
 
   @override
   bool operator ==(Object other) =>
       other is LibraryFilter &&
       other.search == search &&
       other.lang == lang &&
-      other.status == status;
+      other.status == status &&
+      other.collectionId == collectionId;
 
   @override
-  int get hashCode => Object.hash(search, lang, status);
+  int get hashCode => Object.hash(search, lang, status, collectionId);
 }
 
 final libraryFilterProvider = StateProvider<LibraryFilter>((ref) {
@@ -88,6 +116,7 @@ final libraryItemsProvider = StreamProvider<List<ItemWithCard>>((ref) {
         search: filter.search,
         lang: filter.lang,
         status: filter.status,
+        collectionId: filter.collectionId,
       );
 });
 
