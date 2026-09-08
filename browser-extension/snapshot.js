@@ -158,17 +158,18 @@ function appendCard(snapshot, text, answer, { url, collectionId }) {
   return snapshot;
 }
 
-/** 快照中的分类列表（popup 下拉用）。 */
+/** 快照中的分类列表（popup 下拉用）。失败返回 null，调用方保留现状。 */
 async function fetchCollections() {
   const cfg = await loadConfig();
-  if (!cfg.url) return [];
+  if (!cfg.url) return null;
+  let snap;
   try {
-    const snap = await davGet(cfg);
-    if (!snap || !snap.rows) return [];
-    return snap.rows.collections || [];
+    snap = await davGet(cfg);
   } catch (_) {
-    return [];
+    return null;
   }
+  if (!snap || !snap.rows) return null;
+  return snap.rows.collections || null;
 }
 
 // 浏览器端：popup/background 通过 <script>/importScripts 共享全局作用域调用上述函数。

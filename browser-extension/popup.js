@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 let lastCollections = [];
 
 async function refreshCollections() {
-  lastCollections = await fetchCollections();
+  lastCollections = (await fetchCollections()) || [];
   const sel = $('collection');
   sel.innerHTML = '';
   // 「未分类」由下面硬编码兜底，云端同名分类跳过（避免重复选项）

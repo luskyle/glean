@@ -15,12 +15,12 @@ rebuildMenus();
 // 分类签名（id|name 拼接）：云端分类未变则不重建，避免菜单闪烁。
 let _lastMenuSignature = '';
 
-// 菜单显示前同步：划词右键 → onShown 触发 → 拉取云端分类重建菜单。
-// MV3 菜单树是浏览器端缓存，只有此时刷新才能保证"每次右键都是最新"。
-chrome.contextMenus.onShown.addListener(async (_info, _tab) => {
-  await rebuildMenus();
-  // 重建完成后刷新正在显示的菜单（否则本机 WebDAV 这类快路径也看不到新分类）
-  chrome.contextMenus.refresh();
+// 菜单显示前同步：划词右键 → onShown 触发 → 后台拉取云端分类重建菜单。
+// 注意：监听器不可 async——Chrome 会等待返回的 Promise resolve 才显示菜单，
+// 网络慢时会把菜单整掉。这里同步返回，菜单立即显示（沿用缓存分类），
+// 拉取完成后 refresh() 把新分类推进正在显示的菜单。
+chrome.contextMenus.onShown.addListener((_info, _tab) => {
+  rebuildMenus().then(() => chrome.contextMenus.refresh()).catch(() => {});
 });
 
 chrome.runtime.onInstalled.addListener(() => rebuildMenus());
@@ -37,9 +37,9 @@ async function rebuildMenus() {
   try {
     cols = await fetchCollections();
   } catch (_) {
-    return; // 网络异常：保留现有菜单
+    return; // 未配置/网络异常：保留现有菜单
   }
-  cols = cols || [];
+  if (cols == null) return; // 拉取失败：不重建，避免菜单被清空
   const sig = cols.map((c) => `${c.id}:${c.name}`).join('|');
   // 首次（_lastMenuSignature 为空哨兵）始终创建；之后仅在签名变化时重建
   if (_lastMenuSignature !== '' && sig === _lastMenuSignature) return;
