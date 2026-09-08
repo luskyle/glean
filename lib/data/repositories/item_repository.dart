@@ -389,15 +389,37 @@ class ItemRepository {
     return q.watch().map(_mapItemWithCard);
   }
 
-  /// 删除条目与对应卡片（复习日志级联删除）。
+  /// 删除条目与对应卡片（复习日志级联删除；打墓碑防同步复活）。
   Future<void> deleteItem(int itemId) async {
     final item = await (db.select(db.items)..where((t) => t.id.equals(itemId)))
         .getSingleOrNull();
+    await recordDeletion('items', itemId);
+    if (item?.cardId != null) {
+      await recordDeletion('cards', item!.cardId!);
+    }
     await (db.delete(db.items)..where((t) => t.id.equals(itemId))).go();
     if (item?.cardId != null) {
       await (db.delete(db.cards)..where((t) => t.id.equals(item!.cardId!)))
           .go();
     }
+  }
+
+  /// 记录删除墓碑（防止同步 pull 时复活）。
+  Future<void> recordDeletion(String tableName, int entityId) {
+    return db.into(db.syncDeletions).insert(
+          SyncDeletionsCompanion.insert(
+            entityTable: tableName,
+            entityId: entityId,
+            deletedAt: DateTime.now(),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+  }
+
+  /// 全部墓碑键（merge 过滤用）：`table|id` 集合。
+  Future<Set<String>> deletionKeys() async {
+    final rows = await db.select(db.syncDeletions).get();
+    return rows.map((r) => '${r.entityTable}|${r.entityId}').toSet();
   }
 
   /// 编辑卡面字段。
@@ -449,6 +471,7 @@ class ItemRepository {
           .write(CollectionsCompanion(name: Value(name)));
 
   Future<void> deleteCollection(int id) async {
+    await recordDeletion('collections', id);
     await (db.delete(db.itemCollections)
           ..where((t) => t.collectionId.equals(id)))
         .go();

@@ -99,6 +99,39 @@ void main() {
     expect(again.logs, before.logs);
   });
 
+  test('墓碑：删除分类后云端合并不会复活', () async {
+    backupDir = await Directory.systemTemp.createTemp('tombstone');
+    addTearDown(() => backupDir.delete(recursive: true));
+    final svc = SyncService(db: db, cloud: LocalDrive(backupDir));
+    final repo = ItemRepository(db);
+
+    // 本地新建并删除「日语」分类（删除即打墓碑）
+    final japId = await repo.createCollection('日语');
+    await repo.deleteCollection(japId);
+
+    // 云端快照仍包含已删除的「日语」（旧数据），另有一个未被删除的新分类
+    final snap = SyncSnapshot.decode(
+      '{"app":"shiyi","rows":{"collections":['
+      '{"id":$japId,"name":"日语","parentId":null,"ownerId":null,'
+      '"isSystem":false,"createdAt":"2026-09-01T00:00:00.000Z"},'
+      '{"id":9001,"name":"法语","parentId":null,"ownerId":null,'
+      '"isSystem":false,"createdAt":"2026-09-01T00:00:00.000Z"}],'
+      '"cards":[],"items":[],"review_logs":[],"item_collections":[],"item_tags":[]}}',
+    );
+    await svc.merge(db, snap);
+
+    final deleted = await (db.select(db.collections)
+          ..where((t) => t.id.equals(japId)))
+        .get();
+    expect(deleted, isEmpty, reason: '墓碑分类不应被合并复活');
+
+    // 对照：无墓碑的新分类正常合并进来
+    final fresh = await (db.select(db.collections)
+          ..where((t) => t.id.equals(9001)))
+        .get();
+    expect(fresh, hasLength(1), reason: '无墓碑的数据应正常合并');
+  });
+
   test('快照编码/解码往返一致', () async {
     backupDir = await Directory.systemTemp.createTemp('snap_test');
     addTearDown(() => backupDir.delete(recursive: true));

@@ -77,12 +77,18 @@ class SyncService {
     }
   }
 
-  /// 幂等合并：所有行按主键 insertOrIgnore（重复恢复安全）。
+  /// 幂等合并：所有行按主键 insertOrIgnore（重复恢复安全）；
+  /// 被墓碑记录的实体跳过（删除操作不会被同步复活）。
   Future<void> merge(AppDatabase db, SyncSnapshot snap) async {
     final rows = snap.rows;
+    final tombstoneRows = await db.select(db.syncDeletions).get();
+    final tombstones =
+        tombstoneRows.map((r) => '${r.entityTable}|${r.entityId}').toSet();
+
     await db.transaction(() async {
       for (final raw in rows['collections'] as List? ?? const []) {
         final m = raw as Map<String, dynamic>;
+        if (tombstones.contains('collections|${m['id']}')) continue;
         await db.into(db.collections).insert(
               CollectionsCompanion(
                 id: Value(m['id'] as int),
@@ -97,6 +103,7 @@ class SyncService {
       }
       for (final raw in rows['cards'] as List? ?? const []) {
         final m = raw as Map<String, dynamic>;
+        if (tombstones.contains('cards|${m['id']}')) continue; // 墓碑：跳过复活
         await db.into(db.cards).insert(
               CardsCompanion(
                 id: Value(m['id'] as int),
@@ -119,6 +126,7 @@ class SyncService {
       }
       for (final raw in rows['items'] as List? ?? const []) {
         final m = raw as Map<String, dynamic>;
+        if (tombstones.contains('items|${m['id']}')) continue;
         await db.into(db.items).insert(
               ItemsCompanion(
                 id: Value(m['id'] as int),
@@ -152,6 +160,8 @@ class SyncService {
       }
       for (final raw in rows['item_collections'] as List? ?? const []) {
         final m = raw as Map<String, dynamic>;
+        // 所属条目已被墓碑删除 → 跳过（避免外键悬空）
+        if (tombstones.contains('items|${m['itemId']}')) continue;
         await db.into(db.itemCollections).insert(
               ItemCollectionsCompanion.insert(
                 itemId: m['itemId'] as int,
@@ -163,6 +173,7 @@ class SyncService {
       }
       for (final raw in rows['item_tags'] as List? ?? const []) {
         final m = raw as Map<String, dynamic>;
+        if (tombstones.contains('items|${m['itemId']}')) continue;
         await db.into(db.itemTags).insert(
               ItemTagsCompanion.insert(
                 itemId: m['itemId'] as int,

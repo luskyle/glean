@@ -6,7 +6,7 @@ import 'tables.dart';
 
 part 'database.g.dart';
 
-const kSchemaVersion = 1;
+const kSchemaVersion = 2;
 
 /// 拾忆主库（drift/SQLite）。
 ///
@@ -20,7 +20,8 @@ const kSchemaVersion = 1;
     ReviewLogs,
     Collections,
     ItemCollections,
-    ItemTags
+    ItemTags,
+    SyncDeletions,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -43,9 +44,13 @@ class AppDatabase extends _$AppDatabase {
           await _seedSystemCollections();
         },
         onUpgrade: (m, from, to) async {
-          // 破坏性迁移前自动导出 .bak（技术调研 §四）：当前仅占位，
-          // 数据模型锁定后再补备份导出。
-          await m.createAll();
+          if (from < 2) {
+            await m.createTable(syncDeletions);
+          }
+          // 破坏性迁移保留：数据模型锁定后再补备份导出
+          if (from < 1) {
+            await m.createAll();
+          }
         },
       );
 

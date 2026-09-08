@@ -87,6 +87,8 @@ class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
 
   Future<void> _delete() async {
     await ref.read(itemRepositoryProvider).deleteItem(widget.item.item.id);
+    // 删除即同步（墓碑防云端复活），其他端同时收敛
+    ref.read(syncServiceProvider).syncNow().ignore();
     if (mounted) {
       Navigator.of(context).pop();
       ref.invalidate(libraryItemsProvider);

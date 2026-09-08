@@ -17,7 +17,9 @@ class Words extends Table {
 @DataClassName('CardRow')
 class Cards extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get wordId => integer().nullable().references(Words, #id, onDelete: KeyAction.setNull)();
+  IntColumn get wordId => integer()
+      .nullable()
+      .references(Words, #id, onDelete: KeyAction.setNull)();
 
   /// 卡种：word | quote | idea | clip
   TextColumn get kind => text().withDefault(const Constant('word'))();
@@ -46,7 +48,9 @@ class Items extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// 成卡后可空（未成卡 = 待归类）
-  IntColumn get cardId => integer().nullable().references(Cards, #id, onDelete: KeyAction.setNull)();
+  IntColumn get cardId => integer()
+      .nullable()
+      .references(Cards, #id, onDelete: KeyAction.setNull)();
 
   /// 来源：share | clipboard | photo | manual | anki_import
   TextColumn get source => text().withDefault(const Constant('manual'))();
@@ -68,7 +72,8 @@ class Items extends Table {
 @DataClassName('ReviewLogRow')
 class ReviewLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get cardId => integer().references(Cards, #id, onDelete: KeyAction.cascade)();
+  IntColumn get cardId =>
+      integer().references(Cards, #id, onDelete: KeyAction.cascade)();
   DateTimeColumn get reviewedAt => dateTime()();
   IntColumn get quality => integer()();
   IntColumn get intervalDays => integer()();
@@ -95,8 +100,10 @@ class Collections extends Table {
 /// 条目-库 多对多（主库标记决定默认归属视图）
 @DataClassName('ItemCollectionRow')
 class ItemCollections extends Table {
-  IntColumn get itemId => integer().references(Items, #id, onDelete: KeyAction.cascade)();
-  IntColumn get collectionId => integer().references(Collections, #id, onDelete: KeyAction.cascade)();
+  IntColumn get itemId =>
+      integer().references(Items, #id, onDelete: KeyAction.cascade)();
+  IntColumn get collectionId =>
+      integer().references(Collections, #id, onDelete: KeyAction.cascade)();
   BoolColumn get isPrimary => boolean().withDefault(const Constant(false))();
 
   @override
@@ -106,9 +113,21 @@ class ItemCollections extends Table {
 /// 条目标签（多标签交叉，搜索增强）
 @DataClassName('ItemTagRow')
 class ItemTags extends Table {
-  IntColumn get itemId => integer().references(Items, #id, onDelete: KeyAction.cascade)();
+  IntColumn get itemId =>
+      integer().references(Items, #id, onDelete: KeyAction.cascade)();
   TextColumn get tag => text()();
 
   @override
   Set<Column<Object>> get primaryKey => {itemId, tag};
+}
+
+/// 删除墓碑（同步用）：记录被用户删除的实体 id，防止"拉取合并"把它复活。
+@DataClassName('SyncDeletionRow')
+class SyncDeletions extends Table {
+  TextColumn get entityTable => text()();
+  IntColumn get entityId => integer()();
+  DateTimeColumn get deletedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {entityTable, entityId};
 }
