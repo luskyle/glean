@@ -57,6 +57,9 @@ class Items extends Table {
   TextColumn get mediaPath => text().nullable()();
   TextColumn get originalUrl => text().nullable()();
 
+  /// 网页摘录来源页标题（Phase 1：划词收藏自动带出处）
+  TextColumn get sourceTitle => text().nullable()();
+
   /// 用户备注（为什么收）
   TextColumn get note => text().nullable()();
 

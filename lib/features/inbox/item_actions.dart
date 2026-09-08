@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/analytics/analytics_service.dart';
+import '../../core/theme.dart';
 import '../../data/database/database.dart';
 import '../../data/repositories/item_repository.dart';
 import '../../providers.dart';
@@ -122,6 +124,12 @@ class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
               '间隔 ${widget.card.intervalDays} 天 · EF ${widget.card.easeFactor.toStringAsFixed(2)}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            // 出处（Phase 1：浏览器划词收藏自动带来源页）
+            if (widget.item.item.originalUrl != null ||
+                widget.item.item.sourceTitle != null) ...[
+              const SizedBox(height: 12),
+              _SourceRow(item: widget.item.item),
+            ],
             const SizedBox(height: 16),
             TextField(
               controller: _prompt,
@@ -266,6 +274,61 @@ class _ConfirmCardSheetState extends ConsumerState<_ConfirmCardSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 来源行：标题 + 「打开原文」。
+class _SourceRow extends StatelessWidget {
+  const _SourceRow({required this.item});
+
+  final ItemRow item;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final url = item.originalUrl;
+    final title = item.sourceTitle;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.link, size: 16, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title ?? url ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          if (url != null) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () async {
+                final uri = Uri.tryParse(url);
+                if (uri != null && await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Text(
+                '打开原文',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.systemBlue,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

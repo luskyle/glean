@@ -29,6 +29,8 @@ dependencies:
   webdav_client: ^1.1.0
   # 发音：系统 TTS（iOS AVSpeechSynthesizer / Android / 桌面视引擎）
   flutter_tts: ^4.2.0
+  # 打开网页原文（收藏出处回看）
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

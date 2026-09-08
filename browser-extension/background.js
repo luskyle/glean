@@ -66,25 +66,26 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     chrome.storage.local.set({
       pendingText: text,
       pendingUrl: tab?.url || '',
+      pendingTitle: tab?.title || '',
     });
     chrome.action.openPopup();
     return;
   }
   if (typeof info.menuItemId === 'string' && info.menuItemId.startsWith('col-')) {
     const collectionId = parseInt(info.menuItemId.slice(4), 10) || null;
-    const ok = await saveWith(text, tab?.url, collectionId);
+    const ok = await saveWith(text, tab?.url, tab?.title, collectionId);
     notify(ok ? '已收藏到所选分类' : '收藏失败：请先在弹窗配置 WebDAV');
   }
 });
 
-/** 收藏（带可选分类），写入云端成功后通知桌面端实时同步。 */
-async function saveWith(text, url, collectionId) {
+/** 收藏（带可选分类与来源页标题），写入云端成功后通知桌面端实时同步。 */
+async function saveWith(text, url, title, collectionId) {
   try {
     const cfg = await loadConfig();
     if (!cfg.url) return false;
     const snap = (await davGet(cfg)) || emptySnapshot();
     if (!snap.rows) snap.rows = {};
-    appendCard(snap, text, '', { url, collectionId });
+    appendCard(snap, text, '', { url, title, collectionId });
     await davPut(cfg, snap); // davPut 内部会 pingDesktop
     return true;
   } catch (e) {

@@ -302,6 +302,17 @@ class _CollectionGroup extends ConsumerWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
+  /// 列表副标题：答案 + 来源站点（浏览器划词收藏自动带出处）。
+  String _librarySubtitle(ItemWithCard item) {
+    final answer = item.card?.answer ?? '';
+    final url = item.item.originalUrl;
+    if (url == null) return answer;
+    final host = Uri.tryParse(url)?.host ?? '';
+    final source =
+        host.isEmpty ? null : host.replaceFirst(RegExp(r'^www\.'), '');
+    return source == null ? answer : '$answer · $source';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ratio = stat == null
@@ -347,7 +358,7 @@ class _CollectionGroup extends ConsumerWidget {
                 style: const TextStyle(fontWeight: FontWeight.w500),
               ),
               subtitle: Text(
-                item.card?.answer ?? '',
+                _librarySubtitle(item),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

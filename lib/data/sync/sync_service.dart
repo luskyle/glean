@@ -134,6 +134,7 @@ class SyncService {
                 source: Value(m['source'] as String? ?? 'manual'),
                 mediaPath: Value(m['mediaPath'] as String?),
                 originalUrl: Value(m['originalUrl'] as String?),
+                sourceTitle: Value(m['sourceTitle'] as String?),
                 note: Value(m['note'] as String?),
                 lang: Value(m['lang'] as String?),
                 status: Value(m['status'] as String? ?? 'inbox'),

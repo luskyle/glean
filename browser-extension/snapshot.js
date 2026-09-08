@@ -71,7 +71,7 @@ function guessLang(text) {
  * 追加一条收藏（未成卡条目形式，与 App 收件箱对应：status=inbox）。
  * 返回新的快照（在传入 rows 上原地追加并返回引用）。
  */
-function appendInbox(snapshot, text, { url, note, collectionId }) {
+function appendInbox(snapshot, text, { url, title, note, collectionId }) {
   const rows = snapshot.rows;
   rows.items = rows.items || [];
   rows.cards = rows.cards || [];
@@ -103,6 +103,7 @@ function appendInbox(snapshot, text, { url, note, collectionId }) {
     source: 'browser',
     mediaPath: null,
     originalUrl: url || null,
+    sourceTitle: title || null,
     note: note || null,
     lang: guessLang(text),
     status: 'learning', // 直接入复习队列（无收件箱中转）
@@ -115,7 +116,7 @@ function appendInbox(snapshot, text, { url, note, collectionId }) {
 }
 
 /** 追加一条「已成卡」收藏（popup 直接进复习队列）。 */
-function appendCard(snapshot, text, answer, { url, collectionId }) {
+function appendCard(snapshot, text, answer, { url, title, collectionId }) {
   const rows = snapshot.rows;
   rows.items = rows.items || [];
   rows.cards = rows.cards || [];
@@ -147,6 +148,7 @@ function appendCard(snapshot, text, answer, { url, collectionId }) {
     source: 'browser',
     mediaPath: null,
     originalUrl: url || null,
+    sourceTitle: title || null,
     note: null,
     lang: guessLang(text),
     status: 'learning',

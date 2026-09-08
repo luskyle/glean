@@ -132,6 +132,61 @@ void main() {
     expect(fresh, hasLength(1), reason: '无墓碑的数据应正常合并');
   });
 
+  test('快照 sourceTitle：往返保留 + 旧快照（无字段）兼容', () async {
+    backupDir = await Directory.systemTemp.createTemp('snap_title');
+    addTearDown(() => backupDir.delete(recursive: true));
+    final svc = SyncService(db: db, cloud: LocalDrive(backupDir));
+
+    // 浏览器式条目：带 originalUrl + sourceTitle
+    final now = DateTime(2026, 9, 1, 10);
+    await db.into(db.cards).insert(
+          CardsCompanion.insert(
+            kind: const drift.Value('word'),
+            prompt: 'spaced repetition',
+            answer: '间隔重复',
+            lang: const drift.Value('en'),
+            dueAt: now,
+            createdAt: now,
+          ),
+        );
+    final itemId = await db.into(db.items).insert(
+          ItemsCompanion.insert(
+            source: const drift.Value('browser'),
+            originalUrl: const drift.Value('https://example.com/article'),
+            sourceTitle: const drift.Value('间隔重复指南'),
+            lang: const drift.Value('en'),
+            status: const drift.Value('learning'),
+            createdAt: now,
+          ),
+        );
+    await svc.backup();
+
+    // 恢复：sourceTitle 原样回到本地
+    await db.delete(db.items).go();
+    await db.delete(db.cards).go();
+    expect(await svc.restore(), isNull);
+    final merged = await (db.select(db.items)
+          ..where((t) => t.id.equals(itemId)))
+        .getSingle();
+    expect(merged.originalUrl, 'https://example.com/article');
+    expect(merged.sourceTitle, '间隔重复指南');
+
+    // 旧快照（无 sourceTitle 字段）合并不报错、字段为 null
+    final legacy = SyncSnapshot.decode(
+      '{"app":"shiyi","rows":{"collections":[],'
+      '"cards":[],"items":[{"id":9901,"cardId":null,"source":"manual",'
+      '"mediaPath":null,"originalUrl":null,"note":"旧数据","lang":"zh",'
+      '"status":"learning","createdAt":1788846000000}],'
+      '"review_logs":[],"item_collections":[],"item_tags":[]}}',
+    );
+    await svc.merge(db, legacy);
+    final legacyRow = await (db.select(db.items)
+          ..where((t) => t.id.equals(9901)))
+        .getSingle();
+    expect(legacyRow.note, '旧数据');
+    expect(legacyRow.sourceTitle, isNull);
+  });
+
   test('快照编码/解码往返一致', () async {
     backupDir = await Directory.systemTemp.createTemp('snap_test');
     addTearDown(() => backupDir.delete(recursive: true));

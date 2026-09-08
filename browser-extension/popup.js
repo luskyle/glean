@@ -62,8 +62,12 @@ async function saveSelection() {
       snap.rows.collections = lastCollections;
     }
     const collectionId = parseInt($('collection').value, 10) || null;
-    // 已成卡直接进复习队列
-    appendCard(snap, text, '', { url: $('pageUrl').value || null, collectionId });
+    // 已成卡直接进复习队列（带来源页标题）
+    appendCard(snap, text, '', {
+      url: $('pageUrl').value || null,
+      title: $('pageTitle').value || null,
+      collectionId,
+    });
     await davPut(cfg, snap);
     setMsg('已收藏，明天开始复习 ✓', true);
     $('text').value = '';
@@ -83,12 +87,20 @@ function setMsg(t, ok) {
 // storage.set 为异步，popup 打开即读可能取不到——重试最多 500ms。
 let _pendingTries = 0;
 function takePendingText() {
-  chrome.storage.local.get(['pendingText', 'pendingUrl'], (r) => {
+  chrome.storage.local.get(['pendingText', 'pendingUrl', 'pendingTitle'], (r) => {
     if (r.pendingText || _pendingTries >= 10) {
       if (r.pendingText) {
         $('text').value = r.pendingText;
         $('pageUrl').value = r.pendingUrl || '';
-        chrome.storage.local.remove(['pendingText', 'pendingUrl']);
+        $('pageTitle').value = r.pendingTitle || '';
+        const src = $('sourceLine');
+        if (src) {
+          src.textContent = r.pendingTitle
+            ? '来自：' + r.pendingTitle
+            : (r.pendingUrl ? '来自：' + r.pendingUrl : '');
+          src.style.display = (r.pendingTitle || r.pendingUrl) ? '' : 'none';
+        }
+        chrome.storage.local.remove(['pendingText', 'pendingUrl', 'pendingTitle']);
       }
       return;
     }
