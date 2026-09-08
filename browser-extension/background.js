@@ -7,6 +7,10 @@
  */
 importScripts('snapshot.js');
 
+// SW 每次被唤醒（点图标/消息/启动）都重建右键菜单：
+// 解压扩展的「刷新」不会触发 onInstalled，只有运行期执行 create 才生效。
+rebuildMenus();
+
 chrome.runtime.onInstalled.addListener(() => rebuildMenus());
 chrome.runtime.onStartup.addListener(() => rebuildMenus());
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
