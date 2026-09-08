@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers.dart';
 import '../../shared/empty_state.dart';
+import '../../shared/ios_large_title.dart';
 import 'curve_screen.dart';
 import 'review_session_screen.dart';
 
@@ -34,14 +35,16 @@ class ReviewScreen extends ConsumerWidget {
         }
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
+            const IOSLargeTitle('今日复习'),
             if (o.backlog > 0)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
+                  color: const Color(0x1AFF9500), // iOS systemOrange 10% 浅底
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(

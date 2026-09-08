@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/item_repository.dart';
 import '../../providers.dart';
 import '../../shared/empty_state.dart';
+import '../../shared/ios_large_title.dart';
 import '../../shared/status_chip.dart';
 import 'item_actions.dart';
 
@@ -32,13 +33,17 @@ class InboxScreen extends ConsumerWidget {
           );
         }
         return RefreshIndicator(
-          onRefresh: () async =>
-              ref.invalidate(inboxItemsProvider),
+          onRefresh: () async => ref.invalidate(inboxItemsProvider),
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 88),
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 4),
-            itemBuilder: (context, i) => InboxItemTile(item: list[i]),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 88),
+            itemCount: list.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, i) {
+              if (i == 0) {
+                return const IOSLargeTitle('收件箱');
+              }
+              return InboxItemTile(item: list[i - 1]);
+            },
           ),
         );
       },

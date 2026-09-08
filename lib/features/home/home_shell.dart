@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -313,18 +314,18 @@ class _HomeShellState extends ConsumerState<HomeShell>
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.inbox_outlined),
-            selectedIcon: Icon(Icons.inbox),
+            icon: Icon(CupertinoIcons.tray),
+            selectedIcon: Icon(CupertinoIcons.tray_fill),
             label: '收件箱',
           ),
           NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school),
+            icon: Icon(CupertinoIcons.book),
+            selectedIcon: Icon(CupertinoIcons.book_fill),
             label: '复习',
           ),
           NavigationDestination(
-            icon: Icon(Icons.collections_bookmark_outlined),
-            selectedIcon: Icon(Icons.collections_bookmark),
+            icon: Icon(CupertinoIcons.square_grid_2x2),
+            selectedIcon: Icon(CupertinoIcons.square_grid_2x2_fill),
             label: '记忆库',
           ),
         ],

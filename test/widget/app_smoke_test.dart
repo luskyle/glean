@@ -88,8 +88,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 侧栏元素：Logo / 新建收藏 / 分组
-    expect(find.text('新建收藏'), findsOneWidget);
+    // iOS 侧栏元素：大标题「拾忆」/ 导航 / 分组
+    expect(find.text('拾忆'), findsOneWidget);
     expect(find.text('今日复习'), findsOneWidget);
     expect(find.text('分组'), findsOneWidget);
 

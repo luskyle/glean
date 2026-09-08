@@ -79,9 +79,16 @@ class CardFace extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 320),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: scheme.outlineVariant),
+        // iOS 卡片：白色浮层 + 大圆角 + 轻微阴影，无边框
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

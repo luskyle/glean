@@ -5,6 +5,7 @@ import '../../data/database/database.dart';
 import '../../data/repositories/item_repository.dart';
 import '../../providers.dart';
 import '../../shared/empty_state.dart';
+import '../../shared/ios_large_title.dart';
 import '../../shared/status_chip.dart';
 import '../inbox/item_actions.dart';
 
@@ -42,8 +43,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     return Column(
       children: [
+        const IOSLargeTitle('记忆库'),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
           child: TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
@@ -59,7 +61,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             filter.copyWith(search: '');
                       },
                     ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               isDense: true,
             ),
             onChanged: (v) => ref.read(libraryFilterProvider.notifier).state =
@@ -183,7 +186,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ref.invalidate(collectionStatsProvider);
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 88),
         children: [
           for (final entry in groups.entries)
             _CollectionGroup(
@@ -214,7 +217,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
-  Future<void> _renameCollection(BuildContext context, CollectionRow col) async {
+  Future<void> _renameCollection(
+      BuildContext context, CollectionRow col) async {
     final ctrl = TextEditingController(text: col.name);
     final name = await showDialog<String>(
       context: context,
@@ -244,7 +248,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
   }
 
-  Future<void> _deleteCollection(BuildContext context, CollectionRow col) async {
+  Future<void> _deleteCollection(
+      BuildContext context, CollectionRow col) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -295,7 +300,7 @@ class _CollectionGroup extends ConsumerWidget {
         : (stat!.total == 0 ? 0.0 : stat!.mastered / stat!.total);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
         shape: const Border(),
         leading: Icon(
