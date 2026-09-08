@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "拾忆 · 划词收藏",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "划词或摘录收藏到拾忆：写入你的 WebDAV 云盘（坚果云等），桌面与移动端自动同步成复习卡。",
   "permissions": ["contextMenus", "storage"],
   "host_permissions": [

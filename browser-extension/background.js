@@ -14,13 +14,16 @@ let _menuCols = new Map();
 
 // SW 每次被唤醒（点图标/消息/启动/划词右键）都确保基础菜单存在：
 // 解压扩展的「刷新」不触发 onInstalled，只有运行期执行 create 才生效。
+// 运行期路径绝不 removeAll（会摧毁正在显示的菜单），只做增量补建。
 ensureBaseMenus().catch(() => {});
 
-/**
- * 幂等创建基础菜单：Chrome 菜单树持久化，重复 create 会抛
- * "Duplicate id"——捕获忽略即可（标准 MV3 初始化模式）。
- */
+/** 幂等补建基础菜单：已存在则跳过（Duplicate id 捕获）；顺带清理历史遗留项。 */
 async function ensureBaseMenus() {
+  for (const staleId of ['shiyi-save']) {
+    try {
+      await chrome.contextMenus.remove(staleId);
+    } catch (_) {}
+  }
   for (const item of [
     { id: 'shiyi-root', title: '收藏到拾忆' },
     { id: 'shiyi-with-cat', parentId: 'shiyi-root', title: '选分类后收藏…' },
@@ -32,6 +35,22 @@ async function ensureBaseMenus() {
       /* 已存在：跳过 */
     }
   }
+}
+
+/** 全新安装/升级时整树重建（此刻无菜单显示中，removeAll 安全）。 */
+function rebuildMenusFromScratch() {
+  chrome.contextMenus.removeAll(() => {
+    _menuCols.clear();
+    for (const item of [
+      { id: 'shiyi-root', title: '收藏到拾忆' },
+      { id: 'shiyi-with-cat', parentId: 'shiyi-root', title: '选分类后收藏…' },
+      { parentId: 'shiyi-root', type: 'separator' },
+    ]) {
+      try {
+        chrome.contextMenus.create({ ...item, contexts: ['selection'] });
+      } catch (_) {}
+    }
+  });
 }
 
 async function _createColMenu(c) {
@@ -103,8 +122,10 @@ function _refreshMenuColsMap() {
   });
 }
 
-chrome.runtime.onInstalled.addListener(() => ensureBaseMenus().catch(() => {}));
-chrome.runtime.onStartup.addListener(() => ensureBaseMenus().catch(() => {}));
+// 全新安装/升级：整树重建（无菜单显示中，removeAll 安全）；
+// 其余唤醒路径只做增量补建（ensureBaseMenus）。
+chrome.runtime.onInstalled.addListener(() => rebuildMenusFromScratch());
+chrome.runtime.onStartup.addListener(() => rebuildMenusFromScratch());
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.rebuildMenus) {
     syncMenuCategories().then(sendResponse);
@@ -126,7 +147,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!text) return;
 
   if (info.menuItemId === 'shiyi-with-cat') {
-    await chrome.storage.local.set({
+    // openPopup 必须处于用户手势同步上下文：storage.set 发起后
+    // 不 await（openPopup 前没有任何 await，仍同步执行）
+    chrome.storage.local.set({
       pendingText: text,
       pendingUrl: tab?.url || '',
     });

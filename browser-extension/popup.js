@@ -79,14 +79,24 @@ function setMsg(t, ok) {
   setTimeout(() => { m.textContent = ''; m.className = 'msg'; }, 4000);
 }
 
-// 划选文本带入：background 收到右键收藏前先把选区存起来
-chrome.storage.local.get(['pendingText', 'pendingUrl'], (r) => {
-  if (r.pendingText) {
-    $('text').value = r.pendingText;
-    $('pageUrl').value = r.pendingUrl || '';
-    chrome.storage.local.remove(['pendingText', 'pendingUrl']);
-  }
-});
+// 划选文本带入：background 收到右键收藏前先把选区存起来。
+// storage.set 为异步，popup 打开即读可能取不到——重试最多 500ms。
+let _pendingTries = 0;
+function takePendingText() {
+  chrome.storage.local.get(['pendingText', 'pendingUrl'], (r) => {
+    if (r.pendingText || _pendingTries >= 10) {
+      if (r.pendingText) {
+        $('text').value = r.pendingText;
+        $('pageUrl').value = r.pendingUrl || '';
+        chrome.storage.local.remove(['pendingText', 'pendingUrl']);
+      }
+      return;
+    }
+    _pendingTries += 1;
+    setTimeout(takePendingText, 50);
+  });
+}
+takePendingText();
 
 document.getElementById('btnSave').addEventListener('click', saveSelection);
 document.getElementById('btnSaveCfg').addEventListener('click', saveSettings);
