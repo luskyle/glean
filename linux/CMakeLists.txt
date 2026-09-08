@@ -2,6 +2,29 @@
 cmake_minimum_required(VERSION 3.13)
 project(runner LANGUAGES CXX)
 
+# 校准 C++ 标准库头文件路径：flutter-clang 固定查找 gcc-12 的
+# include/c++ 目录，但系统常见只装 gcc-11（/usr/include/c++/11）。
+# 存在则显式加入，避免 url_launcher 等 C++ 插件编译报 type_traits not found。
+foreach(_cxx_inc
+    "/usr/include/c++/11"
+    "/usr/include/x86_64-linux-gnu/c++/11")
+  if(EXISTS "${_cxx_inc}/type_traits" OR EXISTS "${_cxx_inc}")
+    include_directories(SYSTEM "${_cxx_inc}")
+  endif()
+endforeach()
+unset(_cxx_inc)
+
+# C++ 标准库链接路径：flutter-clang 自带 gcc-11（libstdc++.so），
+# 但默认链接器搜索不含该目录；系统对应目录同样加入。
+foreach(_cxx_lib
+    "/media/luskyle/DATA/apps/flutter-clang/usr/lib/gcc/x86_64-linux-gnu/11"
+    "/usr/lib/gcc/x86_64-linux-gnu/11")
+  if(EXISTS "${_cxx_lib}/libstdc++.so")
+    link_directories("${_cxx_lib}")
+  endif()
+endforeach()
+unset(_cxx_lib)
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "shiyi")
