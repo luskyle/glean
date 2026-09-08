@@ -6,7 +6,7 @@ import '../../providers.dart';
 import '../../shared/empty_state.dart';
 import '../../shared/ios_large_title.dart';
 import '../settings/paywall_sheet.dart';
-import 'study_session_screen.dart';
+import 'study_level_screen.dart';
 
 /// 学习 Tab：按语言主动学习（新词闪卡 → 自动进入 SRS 复习队列）。
 ///
@@ -44,7 +44,7 @@ class StudyScreen extends ConsumerWidget {
               if (LanguageCatalog.unlocked(lang.code, isPro: settings.isPro)) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => StudySessionScreen(lang: lang.code),
+                    builder: (_) => StudyLevelScreen(lang: lang.code),
                   ),
                 );
               } else {

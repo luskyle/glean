@@ -8,10 +8,17 @@ import '../review/flashcard.dart';
 /// 学习会话：词库未学词 → 闪卡（先看再自测）→ 「学会」即入复习队列。
 /// 机制闭环：主动学习产出新卡，复习页明天开始接手 SRS 排期。
 class StudySessionScreen extends ConsumerStatefulWidget {
-  const StudySessionScreen(
-      {super.key, required this.lang, this.batchSize = 20});
+  const StudySessionScreen({
+    super.key,
+    required this.lang,
+    this.level,
+    this.batchSize = 20,
+  });
 
   final String lang;
+
+  /// 关卡（words.level 字段）；null = 该语言全部未学词。
+  final String? level;
   final int batchSize;
 
   @override
@@ -35,6 +42,7 @@ class _StudySessionScreenState extends ConsumerState<StudySessionScreen> {
     final repo = ref.read(itemRepositoryProvider);
     final words = await repo.unstudiedWords(
       lang: widget.lang,
+      level: widget.level,
       limit: widget.batchSize,
     );
     setState(() {
@@ -151,21 +159,60 @@ class _StudySessionScreenState extends ConsumerState<StudySessionScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          word.headword,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                        // 词条 + 发音按钮
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                word.headword,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              tooltip: '朗读',
+                              icon: const Icon(Icons.volume_up, size: 22),
+                              onPressed: () => ref
+                                  .read(speechServiceProvider)
+                                  .speak(widget.lang, word.headword),
+                            ),
+                          ],
                         ),
+                        // 读音标注（假名/IPA/罗马音）+ 日语罗马音
                         if (word.reading != null &&
                             word.reading!.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
                             word.reading!,
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
+                          if (widget.lang == 'ja')
+                            Builder(builder: (context) {
+                              final romaji = ref
+                                  .read(dictionaryServiceProvider)
+                                  .readingAnnotation(word.reading!);
+                              if (romaji == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  romaji,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant),
+                                ),
+                              );
+                            }),
                         ],
                       ],
                     ),

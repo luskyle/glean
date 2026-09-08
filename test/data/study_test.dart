@@ -3,6 +3,7 @@ import 'package:shiyi/data/database/database.dart';
 import 'package:shiyi/data/dictionary/dictionary_service.dart';
 import 'package:shiyi/data/dictionary/language_catalog.dart';
 import 'package:shiyi/data/repositories/item_repository.dart';
+import 'package:shiyi/domain/study_plan.dart';
 
 void main() {
   late AppDatabase db;
@@ -15,6 +16,62 @@ void main() {
 
   tearDown(() async {
     await db.close();
+  });
+
+  test('渐进解锁：第一级恒开；下一级需上一级学满门槛 min(prev,100)', () {
+    // 第一级
+    expect(
+      StudyPlan.isLevelUnlocked(index: 0, prevLearned: 0, prevTotal: 697),
+      isTrue,
+    );
+    // 大词级（N5 697）：学满 100 解锁 N4
+    expect(
+      StudyPlan.isLevelUnlocked(index: 1, prevLearned: 99, prevTotal: 697),
+      isFalse,
+    );
+    expect(
+      StudyPlan.isLevelUnlocked(index: 1, prevLearned: 100, prevTotal: 697),
+      isTrue,
+    );
+    // 小词级（15 词）：需学完
+    expect(
+      StudyPlan.isLevelUnlocked(index: 1, prevLearned: 14, prevTotal: 15),
+      isFalse,
+    );
+    expect(
+      StudyPlan.isLevelUnlocked(index: 1, prevLearned: 15, prevTotal: 15),
+      isTrue,
+    );
+  });
+
+  test('关卡顺序与标签', () {
+    expect(StudyPlan.levelsFor('ja'), ['kana', 'N5', 'N4']);
+    expect(StudyPlan.levelsFor('en'), ['A1', 'A2']);
+    expect(StudyPlan.labelOf('N5'), 'N5 基础');
+  });
+
+  test('按关卡过滤未学词（渐进学习数据源）', () async {
+    await repo.importDictionaryEntries(const [
+      DictionaryEntry(
+          lang: 'en',
+          headword: 'apple',
+          reading: '/a/',
+          meaning: '苹果',
+          level: 'A1'),
+      DictionaryEntry(
+          lang: 'en',
+          headword: 'school',
+          reading: '/s/',
+          meaning: '学校',
+          level: 'A2'),
+    ]);
+
+    final a1 = await repo.unstudiedWords(lang: 'en', level: 'A1');
+    expect(a1, hasLength(1));
+    expect(a1.single.headword, 'apple');
+
+    final a2 = await repo.unstudiedWords(lang: 'en', level: 'A2');
+    expect(a2.single.headword, 'school');
   });
 
   test('语言包分级：日语/英语免费，其余 Pro 解锁', () {

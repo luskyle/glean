@@ -10,6 +10,7 @@ import 'data/dictionary/dictionary_service.dart';
 import 'data/repositories/item_repository.dart';
 import 'data/repositories/review_repository.dart';
 import 'data/settings/settings_store.dart';
+import 'data/speech/speech_service.dart';
 import 'data/sync/cloud_drive.dart';
 import 'data/sync/sync_service.dart';
 import 'domain/srs/sm2.dart';
@@ -20,6 +21,11 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase.open();
   ref.onDispose(db.close);
   return db;
+});
+
+/// 发音服务（系统 TTS）。
+final speechServiceProvider = Provider<SpeechService>((ref) {
+  return SpeechService();
 });
 
 /// 埋点服务（本地 JSONL 记录 + 上报占位）。

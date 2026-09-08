@@ -54,9 +54,10 @@ class ItemRepository {
     }
   }
 
-  /// 指定语言中尚未学习（未成卡）的词条（主动学习数据源）。
+  /// 指定语言中尚未学习（未成卡）的词条（主动学习数据源，可按关卡过滤）。
   Future<List<WordRow>> unstudiedWords({
     required String lang,
+    String? level,
     int limit = 20,
   }) async {
     final used = await (db.selectOnly(db.cards)
@@ -66,9 +67,38 @@ class ItemRepository {
     final usedIds =
         used.map((r) => r.read(db.cards.wordId)).whereType<int>().toSet();
 
-    final words =
-        await (db.select(db.words)..where((t) => t.lang.equals(lang))).get();
+    final query = db.select(db.words);
+    if (level != null) {
+      query.where((t) => t.lang.equals(lang) & t.level.equals(level));
+    } else {
+      query.where((t) => t.lang.equals(lang));
+    }
+    final words = await query.get();
     return words.where((w) => !usedIds.contains(w.id)).take(limit).toList();
+  }
+
+  /// 各关卡已学（已成卡）词数：lang + level → count（渐进解锁进度）。
+  Future<Map<String, int>> learnedCountByLevel(String lang) async {
+    final rows = await (db.select(db.words).join([
+      innerJoin(db.cards, db.cards.wordId.equalsExp(db.words.id)),
+    ])
+          ..where(db.words.lang.equals(lang) & db.cards.wordId.isNotNull()))
+        .get();
+    final counts = <String, int>{};
+    for (final r in rows) {
+      final level = r.readTable(db.words).level ?? '默认';
+      counts[level] = (counts[level] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// 某关卡总词数（词库元数据）。
+  Future<int> levelWordCount(String lang, String level) async {
+    final row = await (db.selectOnly(db.words)
+          ..addColumns([countAll()])
+          ..where(db.words.lang.equals(lang) & db.words.level.equals(level)))
+        .getSingle();
+    return row.read(countAll()) ?? 0;
   }
 
   /// 全部卡片数（免费额度上限判定用）。
