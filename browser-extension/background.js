@@ -37,13 +37,6 @@ async function rebuildMenus() {
       title: '选分类后收藏…',
       contexts: ['selection'],
     });
-    // 未划词（网页）→ 收藏当前网页
-    chrome.contextMenus.create({
-      id: 'shiyi-save-page',
-      parentId: 'shiyi-root',
-      title: '收藏当前网页',
-      contexts: ['page'],
-    });
     chrome.contextMenus.create({
       parentId: 'shiyi-root',
       type: 'separator',
@@ -78,11 +71,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const title = tab?.title || '';
 
   // ---- 网页收藏（无划词文本；prompt 存页面标题，answer 存 URL）----
-  if (info.menuItemId === 'shiyi-save-page') {
-    const ok = await savePageWith(url, title, null);
-    notify(ok ? '已收藏当前网页' : '收藏失败：请先在弹窗配置 WebDAV');
-    return;
-  }
   if (typeof info.menuItemId === 'string' &&
       info.menuItemId.startsWith('page-col-')) {
     const collectionId = parseInt(info.menuItemId.slice('page-col-'.length), 10) || null;
