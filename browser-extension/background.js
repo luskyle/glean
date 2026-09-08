@@ -2,9 +2,8 @@
  * Service Worker：
  * - 右键「收藏到拾忆」→ 子菜单：选分类后收藏… / 各分类直达
  * - 菜单中的分类列表来自云端快照（桌面新增/删除分类后自动可见）
- *   （menu 在 SW 启动时与弹窗刷新时重建）
- * - 菜单树是持久化缓存：靠 chrome.alarms 定时唤醒比对云端分类签名，
- *   分类变化时自动重建（无需手动点扩展刷新）
+ * - 菜单树是持久化缓存：靠 contextMenus.onShown 在菜单显示前
+ *   拉取云端分类重建，每次划词右键都是最新（无需定时轮询）
  * - 写入 WebDAV 后 ping 桌面端 → 即时同步
  */
 importScripts('snapshot.js');
@@ -16,10 +15,12 @@ rebuildMenus();
 // 分类签名（id|name 拼接）：云端分类未变则不重建，避免菜单闪烁。
 let _lastMenuSignature = '';
 
-// 定时唤醒：桌面端增删分类后自动同步到右键菜单（默认 1 分钟内）。
-chrome.alarms.create('shiyi-sync-menus', { periodInMinutes: 1 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'shiyi-sync-menus') rebuildMenus();
+// 菜单显示前同步：划词右键 → onShown 触发 → 拉取云端分类重建菜单。
+// MV3 菜单树是浏览器端缓存，只有此时刷新才能保证"每次右键都是最新"。
+chrome.contextMenus.onShown.addListener(async (_info, _tab) => {
+  await rebuildMenus();
+  // 重建完成后刷新正在显示的菜单（否则本机 WebDAV 这类快路径也看不到新分类）
+  chrome.contextMenus.refresh();
 });
 
 chrome.runtime.onInstalled.addListener(() => rebuildMenus());
