@@ -56,7 +56,7 @@ class AppDatabase extends _$AppDatabase {
   /// 确保默认分类（工作/学习/未分类）存在且为系统分类（不可删除）。
   /// 幂等：旧库/新库均可安全调用（启动 bootstrap 也会执行）。
   Future<void> ensureDefaultCollections() async {
-    const defaults = ['工作', '学习', '未分类'];
+    const defaults = {'工作', '学习', '未分类'};
     final existing = await (select(collections)
           ..where((t) => t.isSystem.equals(true)))
         .get();
@@ -71,6 +71,13 @@ class AppDatabase extends _$AppDatabase {
           createdAt: DateTime.now(),
         ),
       );
+    }
+    // 旧库历史系统分类（非默认）降级为普通分类，允许用户删除
+    for (final c in existing) {
+      if (!defaults.contains(c.name)) {
+        await (update(collections)..where((t) => t.id.equals(c.id)))
+            .write(const CollectionsCompanion(isSystem: Value(false)));
+      }
     }
   }
 }
