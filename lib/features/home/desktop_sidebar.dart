@@ -121,15 +121,38 @@ class DesktopSidebar extends ConsumerWidget {
                     data: (cols) => _SidebarGroup(
                       children: [
                         for (final c in cols)
-                          _SidebarRow(
-                            icon: Icons.folder,
-                            label: c.name,
-                            selected: activeTab == 2 &&
-                                ref.watch(libraryFilterProvider).collectionId ==
-                                    c.id,
-                            onTap: () => _openCollection(ref, c),
-                            onLongPress: () =>
-                                _deleteCollection(context, ref, c),
+                          Dismissible(
+                            key: ValueKey('sidebar-col-${c.id}'),
+                            direction: DismissDirection.endToStart,
+                            // 左划 → 确认删除（内容自动回未分类），手动刷新列表
+                            confirmDismiss: (_) async {
+                              await _deleteCollection(context, ref, c);
+                              return false;
+                            },
+                            background: Container(
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: scheme.error.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              child: Icon(
+                                Icons.delete_outline,
+                                color: scheme.error,
+                              ),
+                            ),
+                            child: _SidebarRow(
+                              icon: Icons.folder,
+                              label: c.name,
+                              selected: activeTab == 2 &&
+                                  ref
+                                          .watch(libraryFilterProvider)
+                                          .collectionId ==
+                                      c.id,
+                              onTap: () => _openCollection(ref, c),
+                            ),
                           ),
                       ],
                     ),
@@ -267,7 +290,6 @@ class _SidebarRow extends StatelessWidget {
     required this.onTap,
     this.selected = false,
     this.badge = 0,
-    this.onLongPress,
   });
 
   final IconData icon;
@@ -275,7 +297,6 @@ class _SidebarRow extends StatelessWidget {
   final bool selected;
   final int badge;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +310,6 @@ class _SidebarRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
-        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           child: Row(

@@ -235,6 +235,11 @@ final reviewHeatmapProvider = FutureProvider<Map<DateTime, int>>((ref) {
   return ref.watch(reviewRepositoryProvider).dailyReviewCounts();
 });
 
+/// 学习产生的卡片数（按语言，默认页学习情况）。
+final learnedByLangProvider = FutureProvider<Map<String, int>>((ref) {
+  return ref.watch(itemRepositoryProvider).learnedCountByLang();
+});
+
 /// 今日复习进度（已答/总数），复习会话开始时建立。
 final reviewSessionProvider = StateProvider<ReviewSessionState?>((ref) => null);
 

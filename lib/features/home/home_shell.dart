@@ -254,12 +254,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
               icon: const Icon(Icons.show_chart),
               onPressed: () => _openCurve(),
             ),
-          IconButton(
-            tooltip: '新建收藏',
-            icon: const Icon(Icons.add),
-            onPressed: () => _openAddSheet(),
-          ),
-          // 设置唯一入口：记忆库页顶栏（侧栏不放设置，避免重复）
+          // 收藏入口统一在侧栏右上角 ⊕；此处不放（避免重复）
+          // 设置唯一入口：记忆库页顶栏
           if (tabIndex == 2)
             IconButton(
               tooltip: '设置',

@@ -118,6 +118,22 @@ class ItemRepository {
     return row.read(countAll()) ?? 0;
   }
 
+  /// 通过「学习」产生的卡片数（按语言统计，默认页学习情况展示）。
+  Future<Map<String, int>> learnedCountByLang() async {
+    final rows = await (db.select(db.items).join([
+      innerJoin(db.cards, db.cards.id.equalsExp(db.items.cardId)),
+    ])
+          ..where(
+              db.items.source.equals('study') & db.items.cardId.isNotNull()))
+        .get();
+    final counts = <String, int>{};
+    for (final r in rows) {
+      final lang = r.readTable(db.cards).lang ?? 'other';
+      counts[lang] = (counts[lang] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   /// 全部卡片数（免费额度上限判定用）。
   Future<int> cardCount() async {
     final query = db.selectOnly(db.items)
