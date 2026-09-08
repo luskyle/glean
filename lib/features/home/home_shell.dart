@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,10 +99,16 @@ class _HomeShellState extends ConsumerState<HomeShell>
     ref.read(analyticsProvider).track(AnalyticsEvents.clipboardPromptShown);
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
+    // 轻量提示：缩短时长 + 宽屏居中窄条，避免全宽横幅干扰
+    final screenW = MediaQuery.of(context).size.width;
+    const maxBubble = 420.0;
+    final horizontalMargin =
+        screenW > maxBubble ? (screenW - maxBubble) / 2 : 16.0;
     messenger.showSnackBar(
       SnackBar(
         content: const Text('复制了一段内容，要收藏吗？'),
-        duration: const Duration(seconds: 8),
+        duration: const Duration(seconds: 5),
+        margin: EdgeInsets.fromLTRB(horizontalMargin, 0, horizontalMargin, 28),
         action: SnackBarAction(
           label: '收藏',
           onPressed: () async {
@@ -314,18 +319,18 @@ class _HomeShellState extends ConsumerState<HomeShell>
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(CupertinoIcons.tray),
-            selectedIcon: Icon(CupertinoIcons.tray_fill),
+            icon: Icon(Icons.inbox_outlined),
+            selectedIcon: Icon(Icons.inbox),
             label: '收件箱',
           ),
           NavigationDestination(
-            icon: Icon(CupertinoIcons.book),
-            selectedIcon: Icon(CupertinoIcons.book_fill),
+            icon: Icon(Icons.school_outlined),
+            selectedIcon: Icon(Icons.school),
             label: '复习',
           ),
           NavigationDestination(
-            icon: Icon(CupertinoIcons.square_grid_2x2),
-            selectedIcon: Icon(CupertinoIcons.square_grid_2x2_fill),
+            icon: Icon(Icons.collections_bookmark_outlined),
+            selectedIcon: Icon(Icons.collections_bookmark),
             label: '记忆库',
           ),
         ],

@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/cupertino.dart' show CupertinoButton;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,7 +58,7 @@ class DesktopSidebar extends ConsumerWidget {
                       minimumSize: const Size(34, 34),
                       onPressed: () => _openAddSheet(context),
                       child: Icon(
-                        CupertinoIcons.add_circled,
+                        Icons.add_circle,
                         size: 26,
                         color: AppTheme.systemBlue,
                       ),
@@ -71,21 +71,21 @@ class DesktopSidebar extends ConsumerWidget {
               _SidebarGroup(
                 children: [
                   _SidebarRow(
-                    icon: CupertinoIcons.book_fill,
+                    icon: Icons.school,
                     label: '今日复习',
                     badge: due,
                     selected: activeTab == 1,
                     onTap: () => onSelectTab(1),
                   ),
                   _SidebarRow(
-                    icon: CupertinoIcons.tray_fill,
+                    icon: Icons.inbox,
                     label: '收件箱',
                     badge: inboxCount,
                     selected: activeTab == 0,
                     onTap: () => onSelectTab(0),
                   ),
                   _SidebarRow(
-                    icon: CupertinoIcons.square_grid_2x2_fill,
+                    icon: Icons.collections_bookmark,
                     label: '记忆库',
                     selected: activeTab == 2 && _isAllView(ref),
                     onTap: () => _openLibraryAll(ref),
@@ -108,7 +108,7 @@ class DesktopSidebar extends ConsumerWidget {
                       children: [
                         for (final c in cols)
                           _SidebarRow(
-                            icon: CupertinoIcons.folder_fill,
+                            icon: Icons.folder,
                             label: c.name,
                             selected: activeTab == 2 &&
                                 ref.watch(libraryFilterProvider).collectionId ==
@@ -125,7 +125,7 @@ class DesktopSidebar extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                 child: _SidebarRow(
-                  icon: CupertinoIcons.settings,
+                  icon: Icons.settings,
                   label: '设置',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
