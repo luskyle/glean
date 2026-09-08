@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/analytics/analytics_service.dart';
 import '../../data/database/database.dart';
 import '../../data/repositories/item_repository.dart';
 import '../../providers.dart';
@@ -204,6 +205,10 @@ class _ConfirmCardSheetState extends ConsumerState<_ConfirmCardSheet> {
               ? 'word'
               : 'idea',
         );
+    ref.read(analyticsProvider).track(
+      AnalyticsEvents.itemCardCreated,
+      props: {'source': widget.item.item.source},
+    );
     if (mounted) {
       Navigator.of(context).pop();
       ref.invalidate(inboxItemsProvider);

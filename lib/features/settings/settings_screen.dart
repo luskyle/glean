@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/analytics/analytics_service.dart';
 import '../../data/export/export_service.dart';
 import '../../data/settings/settings_store.dart';
 import '../../providers.dart';
@@ -73,9 +74,7 @@ class SettingsScreen extends ConsumerWidget {
                   onChanged: (v) async {
                     await settings.setClipboardWatch(v);
                     ref.invalidate(settingsProvider);
-                    ref
-                        .read(clipboardWatchEnabledProvider.notifier)
-                        .state = v;
+                    ref.read(clipboardWatchEnabledProvider.notifier).state = v;
                   },
                 ),
               ],
@@ -89,12 +88,15 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('导出我的收藏库'),
-                  subtitle: const Text('元数据 + 复习日志 → 本地 JSON（zip 与云盘同步后续版本）'),
+                  subtitle: const Text('元数据 + 复习日志 → 本地 zip（JSON 机器可读）'),
                   onTap: () async {
                     final messenger = ScaffoldMessenger.of(context);
                     try {
-                      final path = await const ExportService()
+                      final path = await ExportService()
                           .export(ref.read(databaseProvider));
+                      ref
+                          .read(analyticsProvider)
+                          .track(AnalyticsEvents.exportUsed);
                       messenger.showSnackBar(
                         SnackBar(content: Text('已导出：$path')),
                       );

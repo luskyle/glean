@@ -33,7 +33,8 @@ class ReviewRepository {
     final q = db.select(db.cards).join([
       innerJoin(db.items, db.items.cardId.equalsExp(db.cards.id)),
     ])
-      ..where(db.items.cardId.isNotNull() & db.cards.dueAt.isSmallerOrEqualValue(ts))
+      ..where(db.items.cardId.isNotNull() &
+          db.cards.dueAt.isSmallerOrEqualValue(ts))
       ..orderBy([OrderingTerm.asc(db.cards.dueAt)])
       ..limit(limit);
     final rows = await q.get();
@@ -46,15 +47,15 @@ class ReviewRepository {
   }
 
   /// 今日任务数 = 到期卡数。
-  Future<int> dueCount(DateTime? now) async => (await dueCards(now: now)).length;
+  Future<int> dueCount(DateTime? now) async =>
+      (await dueCards(now: now)).length;
 
   /// 积压 = 超过自己 1 个 SRS 间隔仍未复习（防囤积提示）。
   Future<int> backlogCount(DateTime? now) async {
     final ts = now ?? DateTime.now();
     final cards = await dueCards(now: ts, limit: 500);
     return cards
-        .where((c) =>
-            ts.difference(c.card.dueAt).inDays > c.card.intervalDays)
+        .where((c) => ts.difference(c.card.dueAt).inDays > c.card.intervalDays)
         .length;
   }
 
@@ -65,8 +66,8 @@ class ReviewRepository {
     final query = db.selectOnly(db.reviewLogs)
       ..addColumns([countAll()])
       ..where(db.reviewLogs.reviewedAt.isBiggerOrEqualValue(start) &
-          db.reviewLogs.reviewedAt.isSmallerThanValue(
-              start.add(const Duration(days: 1))));
+          db.reviewLogs.reviewedAt
+              .isSmallerThanValue(start.add(const Duration(days: 1))));
     final row = await query.getSingle();
     return row.read(countAll()) ?? 0;
   }
@@ -100,14 +101,14 @@ class ReviewRepository {
     );
 
     await (db.update(db.cards)..where((t) => t.id.equals(cardId))).write(
-          CardsCompanion(
-            repetitions: Value(result.state.repetitions),
-            easeFactor: Value(result.state.easeFactor),
-            intervalDays: Value(result.state.intervalDays),
-            dueAt: Value(result.dueAt),
-            lastReviewedAt: Value(ts),
-          ),
-        );
+      CardsCompanion(
+        repetitions: Value(result.state.repetitions),
+        easeFactor: Value(result.state.easeFactor),
+        intervalDays: Value(result.state.intervalDays),
+        dueAt: Value(result.dueAt),
+        lastReviewedAt: Value(ts),
+      ),
+    );
 
     await db.into(db.reviewLogs).insert(
           ReviewLogsCompanion.insert(
@@ -133,7 +134,8 @@ class ReviewRepository {
   }
 
   /// 状态投影（依据《拾忆App架构》§五：状态从数据派生，实时计算）。
-  String _projectStatus(Sm2State state, {required DateTime lastReviewedAt, required DateTime now}) {
+  String _projectStatus(Sm2State state,
+      {required DateTime lastReviewedAt, required DateTime now}) {
     if (isMastered(state)) return 'mastered';
     if (isCold(lastReviewedAt: lastReviewedAt, now: now)) return 'cold';
     return 'learning';
@@ -159,11 +161,11 @@ class ReviewRepository {
       final start = from.add(Duration(days: 7 * i));
       final bucket = buckets[start] ?? const <ReviewLogRow>[];
       if (bucket.isEmpty) {
-        return WeeklyStat(weekStart: start, reviews: 0, avgQuality: 0, correctRatio: 0);
+        return WeeklyStat(
+            weekStart: start, reviews: 0, avgQuality: 0, correctRatio: 0);
       }
       final sum = bucket.fold<int>(0, (acc, l) => acc + l.quality);
-      final correct =
-          bucket.where((l) => l.quality >= 3).length;
+      final correct = bucket.where((l) => l.quality >= 3).length;
       return WeeklyStat(
         weekStart: start,
         reviews: bucket.length,
@@ -186,6 +188,27 @@ class ReviewRepository {
       ..where(db.items.cardId.isNotNull() & db.items.status.equals('mastered'));
     final m = (await mastered.getSingle()).read(countAll()) ?? 0;
     return m / total;
+  }
+
+  /// 每日复习次数（热力图数据源，review_log 投影）。
+  Future<Map<DateTime, int>> dailyReviewCounts({
+    DateTime? now,
+    int weeks = 12,
+  }) async {
+    final ts = now ?? DateTime.now();
+    final from = ts.subtract(Duration(days: 7 * weeks + 1));
+
+    final logs = await (db.select(db.reviewLogs)
+          ..where((t) => t.reviewedAt.isBiggerOrEqualValue(from)))
+        .get();
+
+    final counts = <DateTime, int>{};
+    for (final log in logs) {
+      final day = DateTime(
+          log.reviewedAt.year, log.reviewedAt.month, log.reviewedAt.day);
+      counts[day] = (counts[day] ?? 0) + 1;
+    }
+    return counts;
   }
 
   DateTime _startOfWeek(DateTime d) {

@@ -7,7 +7,7 @@ import '../../data/repositories/review_repository.dart';
 import '../../providers.dart';
 import '../../shared/empty_state.dart';
 
-/// 遗忘曲线：个人复习正确率 vs 理论基线（周视图，review_log 派生）。
+/// 遗忘曲线：个人复习正确率 vs 理论基线（周视图）+ 复习热力图（12 周）。
 class CurveScreen extends ConsumerWidget {
   const CurveScreen({super.key});
 
@@ -20,12 +20,13 @@ class CurveScreen extends ConsumerWidget {
       body: stats.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),
-        data: (weeks) => _buildBody(context, weeks),
+        data: (weeks) => _buildBody(context, weeks, ref),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, List<WeeklyStat> weeks) {
+  Widget _buildBody(
+      BuildContext context, List<WeeklyStat> weeks, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final withData = weeks.where((w) => w.reviews > 0).toList();
 
@@ -106,8 +107,8 @@ class CurveScreen extends ConsumerWidget {
                         showTitles: true,
                         reservedSize: 40,
                         interval: 25,
-                        getTitlesWidget: (v, meta) =>
-                            Text('${v.round()}%', style: const TextStyle(fontSize: 10)),
+                        getTitlesWidget: (v, meta) => Text('${v.round()}%',
+                            style: const TextStyle(fontSize: 10)),
                       ),
                     ),
                     bottomTitles: AxisTitles(
@@ -154,13 +155,15 @@ class CurveScreen extends ConsumerWidget {
                       curveSmoothness: 0.35,
                       color: scheme.primary,
                       barWidth: 3,
-                      dotData: FlDotData(show: true, getDotPainter: (_, __, ___, ____) =>
-                          FlDotCirclePainter(
-                            radius: 3.5,
-                            color: scheme.primary,
-                            strokeWidth: 2,
-                            strokeColor: scheme.surface,
-                          )),
+                      dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (_, __, ___, ____) =>
+                              FlDotCirclePainter(
+                                radius: 3.5,
+                                color: scheme.primary,
+                                strokeWidth: 2,
+                                strokeColor: scheme.surface,
+                              )),
                       belowBarData: BarAreaData(
                         show: true,
                         color: scheme.primary.withValues(alpha: 0.08),
@@ -181,6 +184,8 @@ class CurveScreen extends ConsumerWidget {
             _LegendDot(color: scheme.outline, label: '理论目标（90%）'),
           ],
         ),
+        const SizedBox(height: 24),
+        _buildHeatmap(context, ref),
         const SizedBox(height: 8),
         Text(
           '数据全部来自真实复习日志：只展示你实际完成的复习。',
@@ -191,6 +196,47 @@ class CurveScreen extends ConsumerWidget {
               ?.copyWith(color: scheme.onSurfaceVariant),
         ),
       ],
+    );
+  }
+
+  /// 复习热力图：GitHub 风格 12 周日历（行 = 周一~周日，列 = 周）。
+  Widget _buildHeatmap(BuildContext context, WidgetRef ref) {
+    final counts = ref.watch(reviewHeatmapProvider);
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.calendar_month, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  '复习热力图（近 12 周）',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            counts.when(
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (byDay) => _HeatmapGrid(counts: byDay),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -254,5 +300,152 @@ class _LegendDot extends StatelessWidget {
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
+  }
+}
+
+/// GitHub 风格复习热力图：列 = 周（近 12 周，截至本周），行 = 周一~周日。
+class _HeatmapGrid extends StatelessWidget {
+  const _HeatmapGrid({required this.counts});
+
+  final Map<DateTime, int> counts;
+
+  static const _cell = 12.0;
+  static const _gap = 3.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final thisMonday = today.subtract(Duration(days: today.weekday - 1));
+
+    // 近 12 周（旧 → 新）
+    final weeks = List.generate(
+      12,
+      (i) => thisMonday.subtract(Duration(days: 7 * (11 - i))),
+    );
+
+    // 每月首个周列标注月份
+    final monthLabels = <int, String>{};
+    var lastMonth = -1;
+    for (var w = 0; w < weeks.length; w++) {
+      final m = weeks[w].month;
+      if (m != lastMonth) {
+        lastMonth = m;
+        monthLabels[w] = '${weeks[w].month}月';
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 月份标注
+        Row(
+          children: [
+            const SizedBox(width: 22), // 对齐星期标签
+            for (var w = 0; w < weeks.length; w++)
+              SizedBox(
+                width: _cell + _gap,
+                child: Text(
+                  monthLabels[w] ?? '',
+                  style: TextStyle(fontSize: 9, color: scheme.onSurfaceVariant),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 星期标签（一/三/五）
+            Column(
+              children: [
+                for (final d in const ['一', '', '三', '', '五', '', ''])
+                  SizedBox(
+                    height: _cell + _gap,
+                    width: 22,
+                    child: Text(
+                      d,
+                      style: TextStyle(
+                          fontSize: 9, color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+              ],
+            ),
+            for (final monday in weeks)
+              Column(
+                children: [
+                  for (var d = 0; d < 7; d++)
+                    _cellWidget(
+                      scheme,
+                      monday.add(Duration(days: d)),
+                    ),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // 图例：少 → 多
+        Row(
+          children: [
+            Text(
+              '少',
+              style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(width: 6),
+            for (final level in [0, 1, 2, 3, 4])
+              Container(
+                width: 10,
+                height: 10,
+                margin: const EdgeInsets.only(right: 3),
+                decoration: BoxDecoration(
+                  color:
+                      _levelColor(scheme, _levelOf(level == 4 ? 6 : level * 2)),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            const SizedBox(width: 3),
+            Text(
+              '多',
+              style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _cellWidget(ColorScheme scheme, DateTime day) {
+    final count = counts[day] ?? 0;
+    return Padding(
+      padding: const EdgeInsets.only(right: _gap, bottom: _gap),
+      child: Container(
+        width: _cell,
+        height: _cell,
+        decoration: BoxDecoration(
+          color: _levelColor(scheme, _levelOf(count)),
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+    );
+  }
+
+  /// 复习量分级：0 / 1 / 2~3 / 4~5 / 6+。
+  static int _levelOf(int count) {
+    if (count <= 0) return 0;
+    if (count == 1) return 1;
+    if (count <= 3) return 2;
+    if (count <= 5) return 3;
+    return 4;
+  }
+
+  Color _levelColor(ColorScheme scheme, int level) {
+    return switch (level) {
+      0 => scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      1 => scheme.primary.withValues(alpha: 0.22),
+      2 => scheme.primary.withValues(alpha: 0.45),
+      3 => scheme.primary.withValues(alpha: 0.7),
+      _ => scheme.primary,
+    };
   }
 }

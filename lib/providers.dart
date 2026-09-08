@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'data/analytics/analytics_service.dart';
 import 'data/database/database.dart';
 import 'data/dictionary/dictionary_service.dart';
 import 'data/repositories/item_repository.dart';
@@ -17,6 +18,13 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase.open();
   ref.onDispose(db.close);
   return db;
+});
+
+/// 埋点服务（本地 JSONL 记录 + 上报占位）。
+final analyticsProvider = Provider<AnalyticsService>((ref) {
+  final svc = AnalyticsService();
+  ref.onDispose(svc.dispose);
+  return svc;
 });
 
 /// 设置存储（测试中可 override）。
@@ -39,7 +47,20 @@ final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {
 });
 
 final dictionaryServiceProvider = Provider<DictionaryService>((ref) {
-  return const DictionaryService();
+  return DictionaryService();
+});
+
+/// 词库引导：载入词库资产到内存索引 + 批量导入 words 表（启动时执行一次，
+/// 幂等；失败静默，有内置样例兜底）。
+final dictionaryBootstrapProvider = FutureProvider<void>((ref) async {
+  final svc = ref.read(dictionaryServiceProvider);
+  final repo = ref.read(itemRepositoryProvider);
+  try {
+    await svc.loadFromAsset();
+    await repo.importDictionaryEntries(svc.loadedEntries);
+  } catch (_) {
+    // 词库不可用不影响核心流程（样例词库兜底）
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -53,7 +74,8 @@ final inboxItemsProvider = StreamProvider<List<ItemWithCard>>((ref) {
 
 /// 记忆库筛选参数。
 class LibraryFilter {
-  const LibraryFilter({this.search = '', this.lang, this.status, this.collectionId});
+  const LibraryFilter(
+      {this.search = '', this.lang, this.status, this.collectionId});
 
   final String search;
   final String? lang;
@@ -62,7 +84,8 @@ class LibraryFilter {
   /// 按库（主库）过滤，null = 全部。
   final int? collectionId;
 
-  LibraryFilter copyWith({String? search, String? lang, String? status, int? collectionId}) {
+  LibraryFilter copyWith(
+      {String? search, String? lang, String? status, int? collectionId}) {
     return LibraryFilter(
       search: search ?? this.search,
       lang: lang ?? this.lang,
@@ -180,9 +203,13 @@ final weeklyStatsProvider = FutureProvider<List<WeeklyStat>>((ref) {
   return ref.watch(reviewRepositoryProvider).weeklyStats();
 });
 
+/// 复习热力图数据（每日次数，近 12 周）。
+final reviewHeatmapProvider = FutureProvider<Map<DateTime, int>>((ref) {
+  return ref.watch(reviewRepositoryProvider).dailyReviewCounts();
+});
+
 /// 今日复习进度（已答/总数），复习会话开始时建立。
-final reviewSessionProvider =
-    StateProvider<ReviewSessionState?>((ref) => null);
+final reviewSessionProvider = StateProvider<ReviewSessionState?>((ref) => null);
 
 class ReviewSessionState {
   const ReviewSessionState({

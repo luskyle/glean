@@ -25,11 +25,35 @@ class CardWithItem {
 
 /// 收藏域仓储：收藏管道 → 成卡 → 记忆库查询。
 class ItemRepository {
-  ItemRepository(this.db, {DictionaryService dictionary = const DictionaryService()})
-      : _dictionary = dictionary;
+  ItemRepository(this.db, {DictionaryService? dictionary})
+      : _dictionary = dictionary ?? DictionaryService();
 
   final AppDatabase db;
   final DictionaryService _dictionary;
+
+  /// 词库批量导入 words 表（幂等：按 headword+reading 去重）。
+  Future<void> importDictionaryEntries(List<DictionaryEntry> entries) async {
+    final existing = await db.select(db.words).get();
+    final existingKeys =
+        existing.map((w) => '${w.headword}|${w.reading}').toSet();
+
+    final batch = <WordsCompanion>[];
+    for (final e in entries) {
+      if (e.lang != 'ja') continue;
+      if (existingKeys.contains('${e.headword}|${e.reading}')) continue;
+      batch.add(
+        WordsCompanion.insert(
+          lang: e.lang,
+          headword: e.headword,
+          reading: Value(e.reading),
+          level: Value(e.level),
+        ),
+      );
+    }
+    if (batch.isNotEmpty) {
+      await db.batch((b) => b.insertAll(db.words, batch));
+    }
+  }
 
   /// 全部卡片数（免费额度上限判定用）。
   Future<int> cardCount() async {
@@ -61,9 +85,7 @@ class ItemRepository {
       final hits = _dictionary.lookup(prompt);
       final hit = hits.isNotEmpty ? hits.first : null;
       if (hit != null) {
-        wordId = await db
-            .into(db.words)
-            .insert(
+        wordId = await db.into(db.words).insert(
               WordsCompanion.insert(
                 lang: hit.lang,
                 headword: hit.headword,
@@ -147,9 +169,7 @@ class ItemRepository {
     final dictionaryHit = _dictionary.lookup(prompt).isNotEmpty;
     if (cardKind == 'word' && dictionaryHit) {
       final hit = _dictionary.lookup(prompt).first;
-      wordId = await db
-          .into(db.words)
-          .insert(
+      wordId = await db.into(db.words).insert(
             WordsCompanion.insert(
               lang: hit.lang,
               headword: hit.headword,
@@ -178,12 +198,12 @@ class ItemRepository {
     ];
 
     await (db.update(db.items)..where((t) => t.id.equals(itemId))).write(
-          ItemsCompanion(
-            cardId: Value(cardId),
-            status: const Value('learning'),
-            note: const Value(null),
-          ),
-        );
+      ItemsCompanion(
+        cardId: Value(cardId),
+        status: const Value('learning'),
+        note: const Value(null),
+      ),
+    );
     await _linkTags(itemId, resolvedTags);
     if (collectionId != null) {
       await _linkCollection(itemId, collectionId);
@@ -257,7 +277,8 @@ class ItemRepository {
         .getSingleOrNull();
     await (db.delete(db.items)..where((t) => t.id.equals(itemId))).go();
     if (item?.cardId != null) {
-      await (db.delete(db.cards)..where((t) => t.id.equals(item!.cardId!))).go();
+      await (db.delete(db.cards)..where((t) => t.id.equals(item!.cardId!)))
+          .go();
     }
   }
 
@@ -272,12 +293,12 @@ class ItemRepository {
         .getSingleOrNull();
     if (item?.cardId == null) return;
     await (db.update(db.cards)..where((t) => t.id.equals(item!.cardId!))).write(
-          CardsCompanion(
-            prompt: prompt == null ? const Value.absent() : Value(prompt),
-            answer: answer == null ? const Value.absent() : Value(answer),
-            tags: tags == null ? const Value.absent() : Value(tags.join(',')),
-          ),
-        );
+      CardsCompanion(
+        prompt: prompt == null ? const Value.absent() : Value(prompt),
+        answer: answer == null ? const Value.absent() : Value(answer),
+        tags: tags == null ? const Value.absent() : Value(tags.join(',')),
+      ),
+    );
   }
 
   // ---- 标签 ----
@@ -293,8 +314,7 @@ class ItemRepository {
 
   // ---- 分组（库）----
 
-  Future<List<CollectionRow>> collections() =>
-      db.select(db.collections).get();
+  Future<List<CollectionRow>> collections() => db.select(db.collections).get();
 
   Future<int> createCollection(String name, {bool isSystem = false}) {
     return db.into(db.collections).insert(
@@ -331,7 +351,8 @@ class ItemRepository {
   /// 条目所属的库（详情页展示用）。
   Future<List<CollectionRow>> collectionsOfItem(int itemId) async {
     final rows = await (db.select(db.itemCollections).join([
-      innerJoin(db.collections, db.collections.id.equalsExp(db.itemCollections.collectionId)),
+      innerJoin(db.collections,
+          db.collections.id.equalsExp(db.itemCollections.collectionId)),
     ])
           ..where(db.itemCollections.itemId.equals(itemId)))
         .get();
@@ -340,9 +361,8 @@ class ItemRepository {
 
   /// 库统计：卡片数 + 已掌握数（记忆库分组头部数据条）。
   Future<Map<int, ({int total, int mastered})>> collectionStats() async {
-    final items = await (db.select(db.items)
-          ..where((t) => t.cardId.isNotNull()))
-        .get();
+    final items =
+        await (db.select(db.items)..where((t) => t.cardId.isNotNull())).get();
     final links = await db.select(db.itemCollections).get();
 
     final stats = <int, ({int total, int mastered})>{};
@@ -350,7 +370,8 @@ class ItemRepository {
     for (final link in links) {
       final item = itemsById[link.itemId];
       if (item == null) continue;
-      final entry = stats.putIfAbsent(link.collectionId, () => (total: 0, mastered: 0));
+      final entry =
+          stats.putIfAbsent(link.collectionId, () => (total: 0, mastered: 0));
       stats[link.collectionId] = (
         total: entry.total + 1,
         mastered: entry.mastered + (item.status == 'mastered' ? 1 : 0),

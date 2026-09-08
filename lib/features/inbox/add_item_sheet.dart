@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/analytics/analytics_service.dart';
 import '../../data/settings/settings_store.dart';
 import '../../domain/tagging/language.dart';
 import '../../providers.dart';
@@ -59,13 +60,15 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
           .showSnackBar(const SnackBar(content: Text('正面内容不能为空')));
       return;
     }
-    final answer = _answerCtrl.text.trim().isEmpty
-        ? '（待补充答案）'
-        : _answerCtrl.text.trim();
+    final answer =
+        _answerCtrl.text.trim().isEmpty ? '（待补充答案）' : _answerCtrl.text.trim();
 
     final quota = await ref.read(quotaProvider.future);
     if (quota.libraryFull) {
-      if (mounted) PaywallSheet.show(context: context, reason: '记忆库已满 ${Quota.maxLibraryCards} 张');
+      if (mounted) {
+        PaywallSheet.show(
+            context: context, reason: '记忆库已满 ${Quota.maxLibraryCards} 张');
+      }
       return;
     }
 
@@ -79,6 +82,10 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
       tags: _tags.toList(),
       note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       collectionId: _collectionId,
+    );
+    ref.read(analyticsProvider).track(
+      AnalyticsEvents.itemCollected,
+      props: {'source': 'manual', 'kind': _kind},
     );
 
     if (mounted) {
@@ -110,17 +117,24 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
             const SizedBox(height: 4),
             Text(
               '保存后自动进入复习队列，明天首次复习',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             SegmentedButton<String>(
               segments: const [
-                ButtonSegment(value: 'word', label: Text('词条'), icon: Icon(Icons.translate)),
-                ButtonSegment(value: 'quote', label: Text('语录'), icon: Icon(Icons.format_quote)),
-                ButtonSegment(value: 'idea', label: Text('灵感'), icon: Icon(Icons.lightbulb_outline)),
+                ButtonSegment(
+                    value: 'word',
+                    label: Text('词条'),
+                    icon: Icon(Icons.translate)),
+                ButtonSegment(
+                    value: 'quote',
+                    label: Text('语录'),
+                    icon: Icon(Icons.format_quote)),
+                ButtonSegment(
+                    value: 'idea',
+                    label: Text('灵感'),
+                    icon: Icon(Icons.lightbulb_outline)),
               ],
               selected: {_kind},
               onSelectionChanged: (s) => setState(() => _kind = s.first),

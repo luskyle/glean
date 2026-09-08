@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/analytics/analytics_service.dart';
 import '../../data/repositories/item_repository.dart';
 import '../../data/settings/settings_store.dart';
 import '../../domain/srs/sm2.dart';
@@ -19,7 +20,8 @@ class ReviewSessionScreen extends ConsumerStatefulWidget {
   const ReviewSessionScreen({super.key});
 
   @override
-  ConsumerState<ReviewSessionScreen> createState() => _ReviewSessionScreenState();
+  ConsumerState<ReviewSessionScreen> createState() =>
+      _ReviewSessionScreenState();
 }
 
 class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
@@ -46,8 +48,7 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
     var allowed = cards.length;
     var truncated = 0;
     if (!quota.isPro) {
-      final remaining =
-          math.max(0, Quota.maxDailyReviews - quota.reviewsToday);
+      final remaining = math.max(0, Quota.maxDailyReviews - quota.reviewsToday);
       if (cards.length > remaining) {
         truncated = cards.length - remaining;
         allowed = remaining;
@@ -64,13 +65,18 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
 
   Future<void> _rate(ReviewRating rating) async {
     final card = _queue[_index].card;
+    final quality = sm2QualityFor(rating);
+    ref.read(analyticsProvider).track(
+      AnalyticsEvents.reviewRating,
+      props: {'quality': quality},
+    );
     await ref.read(reviewRepositoryProvider).reviewCard(
           cardId: card.id,
           rating: rating,
         );
     setState(() {
       _answered += 1;
-      _qualitySum += sm2QualityFor(rating);
+      _qualitySum += quality;
       if (_index + 1 >= _queue.length) {
         _finished = true;
       } else {
@@ -79,6 +85,10 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
       }
     });
     if (_finished) {
+      ref.read(analyticsProvider).track(
+        AnalyticsEvents.reviewSessionCompleted,
+        props: {'count': _answered},
+      );
       ref.invalidate(dueCardsProvider);
       ref.invalidate(reviewOverviewProvider);
       ref.invalidate(quotaProvider);
@@ -104,7 +114,8 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              LinearProgressIndicator(value: progress, borderRadius: BorderRadius.circular(4)),
+              LinearProgressIndicator(
+                  value: progress, borderRadius: BorderRadius.circular(4)),
               const SizedBox(height: 16),
               Expanded(
                 child: Flashcard(
@@ -170,8 +181,7 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
   }
 
   Widget _buildCompletion() {
-    final avgQuality =
-        _answered == 0 ? 0.0 : _qualitySum / _answered;
+    final avgQuality = _answered == 0 ? 0.0 : _qualitySum / _answered;
     final summary = _answered == 0
         ? '今天没有到期的卡片'
         : '完成 $_answered 张 · 平均评级 ${avgQuality.toStringAsFixed(1)}/5';
@@ -199,7 +209,8 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
                 const SizedBox(height: 12),
                 Text(
                   '还有 $_limitHit 张因免费额度未复习',
-                  style: TextStyle(color: Theme.of(context).colorScheme.tertiary),
+                  style:
+                      TextStyle(color: Theme.of(context).colorScheme.tertiary),
                 ),
                 TextButton(
                   onPressed: () =>

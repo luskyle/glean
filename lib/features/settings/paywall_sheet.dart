@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/analytics/analytics_service.dart';
+import '../../providers.dart';
 
 /// 订阅墙（占位）：26 元/月、198 元/年、398 元/买断。
 /// 内购接入在阶段 2（W7~10）完成，MVP 仅展示方案与免费额度对照。
@@ -11,6 +15,10 @@ class PaywallSheet extends StatelessWidget {
     required BuildContext context,
     required String reason,
   }) {
+    // 付费墙曝光（触发时机：额度超限 / 升级入口）
+    ProviderScope.containerOf(context, listen: false)
+        .read(analyticsProvider)
+        .track(AnalyticsEvents.paywallShown, props: {'reason': reason});
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,

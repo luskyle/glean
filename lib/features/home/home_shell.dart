@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/analytics/analytics_service.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
 import '../inbox/inbox_screen.dart';
@@ -26,7 +27,8 @@ class HomeShell extends ConsumerStatefulWidget {
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell>
+    with WidgetsBindingObserver {
   static const _titles = ['收件箱', '今日复习', '记忆库'];
   static const _wideBreakpoint = 900.0;
 
@@ -38,6 +40,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    ref.read(analyticsProvider).track(AnalyticsEvents.appOpen);
+    // 词库引导：载入 JLPT 词库资产（内存索引 + words 表），失败静默
+    ref.read(dictionaryBootstrapProvider.future).catchError((_) {});
     // 剪贴板监听：创建 watcher 并启动（设置里可关闭）
     _watcher = ClipboardWatcher(
       readClipboard: _readClipboard,
@@ -50,10 +56,33 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchCtrl.dispose();
     _watcher?.dispose();
     _watcher = null;
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final analytics = ref.read(analyticsProvider);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        analytics.track(AnalyticsEvents.appResume);
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        analytics.track(AnalyticsEvents.appBackground);
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  void _trackTab(int index) {
+    ref.read(analyticsProvider).track(
+      AnalyticsEvents.appTabViewed,
+      props: {'tab': index},
+    );
   }
 
   Future<String?> _readClipboard() async {
@@ -67,6 +96,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   Future<void> _onClipboardCapture(String text) async {
     if (!mounted) return;
+    ref.read(analyticsProvider).track(AnalyticsEvents.clipboardPromptShown);
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
@@ -78,6 +108,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           onPressed: () async {
             final repo = ref.read(itemRepositoryProvider);
             await repo.createInboxItem(text: text, source: 'clipboard');
+            ref.read(analyticsProvider).track(
+              AnalyticsEvents.itemCollected,
+              props: {'source': 'clipboard'},
+            );
             ref.invalidate(inboxItemsProvider);
             messenger.showSnackBar(
               const SnackBar(content: Text('已收进收件箱，稍后整理成卡')),
@@ -123,8 +157,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         children: [
           DesktopSidebar(
             activeTab: tabIndex,
-            onSelectTab: (i) =>
-                ref.read(homeTabIndexProvider.notifier).state = i,
+            onSelectTab: (i) {
+              _trackTab(i);
+              ref.read(homeTabIndexProvider.notifier).state = i;
+            },
           ),
           const VerticalDivider(width: 1),
           Expanded(
@@ -174,13 +210,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                         icon: const Icon(Icons.clear, size: 18),
                         onPressed: () {
                           _searchCtrl.clear();
-                          ref.read(libraryFilterProvider.notifier).state =
-                              ref.read(libraryFilterProvider).copyWith(search: '');
+                          ref.read(libraryFilterProvider.notifier).state = ref
+                              .read(libraryFilterProvider)
+                              .copyWith(search: '');
                         },
                       ),
                 isDense: true,
                 filled: true,
-                fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                fillColor:
+                    scheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -269,8 +307,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: tabIndex,
-        onDestinationSelected: (i) =>
-            ref.read(homeTabIndexProvider.notifier).state = i,
+        onDestinationSelected: (i) {
+          _trackTab(i);
+          ref.read(homeTabIndexProvider.notifier).state = i;
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.inbox_outlined),
