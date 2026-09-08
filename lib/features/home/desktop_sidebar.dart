@@ -73,12 +73,6 @@ class DesktopSidebar extends ConsumerWidget {
                     onTap: () => onSelectTab(0),
                   ),
                   _SidebarRow(
-                    icon: Icons.collections_bookmark,
-                    label: '记忆库',
-                    selected: activeTab == 1 && _isAllView(ref),
-                    onTap: () => _openLibraryAll(ref),
-                  ),
-                  _SidebarRow(
                     icon: Icons.translate,
                     label: '学习',
                     selected: activeTab == 2,
@@ -224,15 +218,6 @@ class DesktopSidebar extends ConsumerWidget {
       // 分类即时同步到云端
       ref.read(syncServiceProvider).syncNow().ignore();
     }
-  }
-
-  bool _isAllView(WidgetRef ref) =>
-      ref.read(libraryFilterProvider).collectionId == null;
-
-  void _openLibraryAll(WidgetRef ref) {
-    ref.read(libraryFilterProvider.notifier).state =
-        ref.read(libraryFilterProvider).withCollection(null);
-    onSelectTab(1);
   }
 
   void _openCollection(WidgetRef ref, CollectionRow c) {

@@ -9,7 +9,7 @@ import '../../shared/ios_large_title.dart';
 import '../../shared/status_chip.dart';
 import '../inbox/item_actions.dart';
 
-/// 记忆库：全部成卡的管理视图。
+/// 分组内容：展示某个分组的全部成卡。
 /// 搜索（全文）/ 筛选（语言、状态）/ 分组（库 + 未分类兜底）。
 ///
 /// [active]：非活动 Tab 时 build 短路，停止构建与流监听（减少后台开销）。
@@ -41,9 +41,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final links = ref.watch(itemCollectionLinksProvider);
     final stats = ref.watch(collectionStatsProvider);
 
+    // 标题：选中分组 → 分组名；未选（全部/搜索）→ 收藏
+    final selectedName = filter.collectionId == null
+        ? null
+        : collections.value
+            ?.where((c) => c.id == filter.collectionId)
+            .map((c) => c.name)
+            .firstOrNull;
+    final title = selectedName ?? '收藏';
+
     return Column(
       children: [
-        const IOSLargeTitle('记忆库'),
+        IOSLargeTitle(title),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
           child: TextField(
@@ -124,10 +133,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             error: (e, _) => Center(child: Text('加载失败：$e')),
             data: (list) {
               if (list.isEmpty) {
-                return const EmptyState(
+                return EmptyState(
                   icon: Icons.collections_bookmark_outlined,
-                  title: '记忆库还空着',
-                  subtitle: '收件箱的条目成卡后会自动出现在这里（默认未分类）。',
+                  title: selectedName == null ? '还没有收藏' : '「$title」还空着',
+                  subtitle: '侧栏分组 + 或右上角 ⊕ 收藏，内容会出现在对应分组。',
                 );
               }
               return _groupedList(

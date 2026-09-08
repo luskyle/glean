@@ -33,7 +33,7 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
-  static const _titles = ['今日复习', '记忆库', '学习'];
+  static const _titles = ['今日复习', '收藏', '学习'];
   static const _wideBreakpoint = 900.0;
 
   /// 顶栏全局搜索框控制器（宽屏）。
@@ -246,7 +246,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
             child: TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
-                hintText: '搜索记忆库…',
+                hintText: '搜索收藏…',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 suffixIcon: _searchCtrl.text.isEmpty
                     ? null
@@ -270,9 +270,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
               onChanged: (v) {
-                // 输入即切到记忆库并搜索
-                if (tabIndex != 2) {
-                  ref.read(homeTabIndexProvider.notifier).state = 2;
+                // 输入即切到收藏/分组内容页并搜索
+                if (tabIndex != 1) {
+                  ref.read(homeTabIndexProvider.notifier).state = 1;
                 }
                 ref.read(libraryFilterProvider.notifier).state =
                     ref.read(libraryFilterProvider).copyWith(search: v);
@@ -280,7 +280,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
             ),
           ),
           const Spacer(),
-          if (tabIndex == 1)
+          if (tabIndex == 0)
             IconButton(
               tooltip: '遗忘曲线',
               icon: const Icon(Icons.show_chart),
@@ -307,14 +307,13 @@ class _HomeShellState extends ConsumerState<HomeShell>
       appBar: AppBar(
         title: Text(_titles[tabIndex]),
         actions: [
+          // 分类入口：任何页面都可直接选分组查看内容
+          IconButton(
+            tooltip: '分类',
+            icon: const Icon(Icons.folder_outlined),
+            onPressed: () => _openCollectionPicker(),
+          ),
           if (tabIndex == 0)
-            IconButton(
-              tooltip: '搜索（记忆库）',
-              icon: const Icon(Icons.search),
-              onPressed: () =>
-                  ref.read(homeTabIndexProvider.notifier).state = 2,
-            ),
-          if (tabIndex == 1)
             IconButton(
               tooltip: '遗忘曲线',
               icon: const Icon(Icons.show_chart),
@@ -344,21 +343,19 @@ class _HomeShellState extends ConsumerState<HomeShell>
         label: const Text('收藏'),
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: tabIndex,
+        // 底栏两主 tab；分组内容（tabIndex==1）经顶栏分类入口进入，
+        // 无对应底栏项时回退高亮复习（0）
+        selectedIndex: tabIndex == 2 ? 1 : 0,
         onDestinationSelected: (i) {
-          _trackTab(i);
-          ref.read(homeTabIndexProvider.notifier).state = i;
+          final target = i == 0 ? 0 : 2;
+          _trackTab(target);
+          ref.read(homeTabIndexProvider.notifier).state = target;
         },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.school_outlined),
             selectedIcon: Icon(Icons.school),
             label: '复习',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.collections_bookmark_outlined),
-            selectedIcon: Icon(Icons.collections_bookmark),
-            label: '记忆库',
           ),
           NavigationDestination(
             icon: Icon(Icons.translate),
@@ -368,6 +365,40 @@ class _HomeShellState extends ConsumerState<HomeShell>
         ],
       ),
     );
+  }
+
+  /// 窄屏分类入口：弹分组选择，点选后进入该分组内容（tab 1）。
+  Future<void> _openCollectionPicker() async {
+    final cols = await ref.read(itemRepositoryProvider).collections();
+    if (!mounted) return;
+    final res = await showModalBottomSheet<String>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child:
+                  Text('选择分组', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            for (final c in cols)
+              ListTile(
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(c.name),
+                onTap: () => Navigator.pop(context, '${c.id}'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (res != null) {
+      final id = int.tryParse(res);
+      ref.read(libraryFilterProvider.notifier).state =
+          ref.read(libraryFilterProvider).withCollection(id);
+      ref.read(homeTabIndexProvider.notifier).state = 1;
+    }
   }
 
   void _openAddSheet() {

@@ -45,15 +45,17 @@ void main() {
     expect(find.text('今日复习'), findsOneWidget);
     expect(find.text('今天还没有复习任务'), findsOneWidget);
 
-    // 切到记忆库
-    await tester.tap(find.text('记忆库'));
-    await tester.pumpAndSettle();
-    expect(find.text('记忆库还空着'), findsOneWidget);
-
-    // 切到学习
+    // 窄屏两主 tab：切到学习
     await tester.tap(find.text('学习'));
     await tester.pumpAndSettle();
     expect(find.text('日语'), findsWidgets); // 学习页语言包列表
+
+    // 顶栏分类按钮 → 弹分组选择 → 进入分组内容
+    await tester.tap(find.byIcon(Icons.folder_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('工作'));
+    await tester.pumpAndSettle();
+    expect(find.text('「工作」还空着'), findsOneWidget);
   });
 
   testWidgets('空库时复习页显示引导，且不显示开始按钮', (tester) async {
@@ -99,10 +101,10 @@ void main() {
     // 仍显示复习页默认落点内容
     expect(find.text('今天还没有复习任务'), findsOneWidget);
 
-    // 侧栏切到记忆库
-    await tester.tap(find.text('记忆库'));
+    // 侧栏分组 → 分组内容（宽屏）
+    await tester.tap(find.text('工作'));
     await tester.pumpAndSettle();
-    expect(find.text('记忆库还空着'), findsOneWidget);
+    expect(find.text('「工作」还空着'), findsOneWidget);
   });
 
   testWidgets('设置页可切换深色/浅色/跟随系统主题', (tester) async {
