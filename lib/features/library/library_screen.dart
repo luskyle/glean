@@ -351,9 +351,8 @@ class _GroupedContentView extends ConsumerWidget {
     );
   }
 
-  /// 网格模式：分组头 + Apple Store 风格卡片瀑布流。
+  /// 网格模式：分组头 + Apple Store 风格方形卡片。
   Widget buildGrid(BuildContext context) {
-    // 展平为 (分组, 条目) 序列，分组间用 header 分隔
     final blocks = <Widget>[];
     for (final (col, colItems) in _groups()) {
       blocks.add(
@@ -369,7 +368,6 @@ class _GroupedContentView extends ConsumerWidget {
         LayoutBuilder(
           builder: (ctx, cons) {
             final width = cons.maxWidth;
-            // 参考 Apple Store：窄屏 2 列，宽屏 3~4 列
             final columns = width >= 1100 ? 4 : (width >= 760 ? 3 : 2);
             const spacing = 12.0;
             final cardWidth = (width - spacing * (columns - 1)) / columns;
@@ -380,6 +378,7 @@ class _GroupedContentView extends ConsumerWidget {
                 for (final item in colItems)
                   SizedBox(
                     width: cardWidth,
+                    height: cardWidth, // 方形卡片
                     child: _ItemGridCard(item: item),
                   ),
               ],
@@ -533,6 +532,7 @@ class _ItemGridCard extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // 顶部：语言角标 / 卡种 + 状态徽标
               Row(
@@ -577,7 +577,6 @@ class _ItemGridCard extends ConsumerWidget {
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
-              const Spacer(),
               const SizedBox(height: 8),
               // 底部：来源 + 复习间隔
               Row(
@@ -597,9 +596,8 @@ class _ItemGridCard extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    const Spacer(),
-                  ] else
-                    const Spacer(),
+                  ],
+                  const Spacer(),
                   Text(
                     card != null && card.intervalDays > 0
                         ? '${card.intervalDays} 天后'
