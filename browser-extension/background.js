@@ -1,6 +1,6 @@
 /**
  * Service Worker：
- * - 右键「收藏到拾忆」→ 子菜单：快速收藏（未分类）/ 选分类… / 各分类直达
+ * - 右键「收藏到拾忆」→ 子菜单：选分类后收藏… / 各分类直达
  * - 菜单中的分类列表来自云端快照（桌面新增分类后自动可见）
  *   （menu 在 SW 启动时与弹窗刷新时重建）
  * - 写入 WebDAV 后 ping 桌面端 → 即时同步
@@ -28,12 +28,6 @@ async function rebuildMenus() {
       contexts: ['selection'], // 仅划词（选中文本）时显示
     });
     chrome.contextMenus.create({
-      id: 'shiyi-save',
-      parentId: 'shiyi-root',
-      title: '快速收藏（未分类）',
-      contexts: ['selection'],
-    });
-    chrome.contextMenus.create({
       id: 'shiyi-with-cat',
       parentId: 'shiyi-root',
       title: '选分类后收藏…',
@@ -44,12 +38,10 @@ async function rebuildMenus() {
       type: 'separator',
       contexts: ['selection'],
     });
-    // 云端分类直达（异步拉取后追加；失败则只有上面三项）。
-    // 「未分类」已有「快速收藏（未分类）」入口，跳过避免重复。
+    // 云端分类直达（异步拉取后追加；失败则只有上面一项）
     (async () => {
       const cols = await fetchCollections();
       for (const c of cols) {
-        if (c.name === '未分类') continue;
         chrome.contextMenus.create({
           id: `col-${c.id}`,
           parentId: 'shiyi-root',
@@ -65,11 +57,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const text = (info.selectionText || '').trim();
   if (!text) return;
 
-  if (info.menuItemId === 'shiyi-save') {
-    const ok = await saveWith(text, tab?.url, null);
-    notify(ok ? '已收藏（未分类）· 明天开始复习' : '收藏失败：请先在弹窗配置 WebDAV');
-    return;
-  }
   if (info.menuItemId === 'shiyi-with-cat') {
     await chrome.storage.local.set({
       pendingText: text,
