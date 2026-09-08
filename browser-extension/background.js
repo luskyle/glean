@@ -22,20 +22,27 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 async function rebuildMenus() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: 'shiyi-root', title: '收藏到拾忆' });
+    chrome.contextMenus.create({
+      id: 'shiyi-root',
+      title: '收藏到拾忆',
+      contexts: ['selection'], // 仅划词（选中文本）时显示
+    });
     chrome.contextMenus.create({
       id: 'shiyi-save',
       parentId: 'shiyi-root',
       title: '快速收藏（未分类）',
+      contexts: ['selection'],
     });
     chrome.contextMenus.create({
       id: 'shiyi-with-cat',
       parentId: 'shiyi-root',
       title: '选分类后收藏…',
+      contexts: ['selection'],
     });
     chrome.contextMenus.create({
       parentId: 'shiyi-root',
       type: 'separator',
+      contexts: ['selection'],
     });
     // 云端分类直达（异步拉取后追加；失败则只有上面三项）
     (async () => {
@@ -45,6 +52,7 @@ async function rebuildMenus() {
           id: `col-${c.id}`,
           parentId: 'shiyi-root',
           title: `收藏到「${c.name}」`,
+          contexts: ['selection'],
         });
       }
     })();
