@@ -195,10 +195,12 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: Colors.transparent,
+      bottomSheetTheme: BottomSheetThemeData(
+        // 桌面无 iOS 毛玻璃层：用不透明表面色，避免弹窗内容透明看不清
+        backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
+        dragHandleColor: secondaryLabel,
       ),
     );
   }
