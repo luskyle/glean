@@ -70,6 +70,45 @@ class SettingsScreen extends ConsumerWidget {
           Card(
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.brightness_6_outlined),
+                  title: const Text('外观'),
+                  subtitle: Text(_themeLabel(ref.watch(themeModeProvider))),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: SegmentedButton<ThemeMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        icon: Icon(Icons.brightness_auto_outlined),
+                        label: Text('跟随系统'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        icon: Icon(Icons.light_mode_outlined),
+                        label: Text('浅色'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        icon: Icon(Icons.dark_mode_outlined),
+                        label: Text('深色'),
+                      ),
+                    ],
+                    selected: {ref.watch(themeModeProvider)},
+                    onSelectionChanged: (v) async {
+                      final mode = v.first;
+                      ref.read(themeModeProvider.notifier).state = mode;
+                      await ref.read(settingsProvider).setThemeMode(
+                            switch (mode) {
+                              ThemeMode.light => 'light',
+                              ThemeMode.dark => 'dark',
+                              _ => 'system',
+                            },
+                          );
+                    },
+                  ),
+                ),
                 SwitchListTile(
                   secondary: const Icon(Icons.content_paste_search),
                   title: const Text('剪贴板监听'),
@@ -144,4 +183,10 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+
+  String _themeLabel(ThemeMode mode) => switch (mode) {
+        ThemeMode.light => '浅色',
+        ThemeMode.dark => '深色',
+        _ => '跟随系统',
+      };
 }

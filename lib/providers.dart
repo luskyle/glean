@@ -304,6 +304,16 @@ final clipboardWatchEnabledProvider = StateProvider<bool>((ref) {
   return ref.watch(settingsProvider).clipboardWatchEnabled;
 });
 
+/// 主题模式（UI 状态：system / light / dark；随设置持久化）。
+final themeModeProvider = StateProvider<ThemeMode>((ref) {
+  final raw = ref.watch(settingsProvider).themeMode;
+  return switch (raw) {
+    'light' => ThemeMode.light,
+    'dark' => ThemeMode.dark,
+    _ => ThemeMode.system,
+  };
+});
+
 /// 剪贴板轮询器：App 前台时每 4s 检查一次（可关闭）。
 /// 有新的可收藏文本 → 通过 [onCapture] 回调通知 UI 弹轻提示。
 class ClipboardWatcher {

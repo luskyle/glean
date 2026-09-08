@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shiyi/app.dart';
 import 'package:shiyi/data/database/database.dart';
 import 'package:shiyi/data/settings/settings_store.dart';
+import 'package:shiyi/features/settings/settings_screen.dart';
 import 'package:shiyi/providers.dart';
 
 /// 测试环境公共搭建：内存库 + 关闭剪贴板监听的设置。
@@ -102,5 +103,49 @@ void main() {
     await tester.tap(find.text('记忆库'));
     await tester.pumpAndSettle();
     expect(find.text('记忆库还空着'), findsOneWidget);
+  });
+
+  testWidgets('设置页可切换深色/浅色/跟随系统主题', (tester) async {
+    final container = await buildTestContainer();
+    addTearDown(container.dispose);
+
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const ShiyiApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 默认跟随系统
+    expect(container.read(themeModeProvider), ThemeMode.system);
+
+    // 进入设置（侧栏底部设置入口 → 这里通过 Provider 容器直接推到设置页较复杂，
+    // 改为验证设置页组件可独立渲染并切换）
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('外观'), findsOneWidget);
+
+    // 点亮「深色」→ provider + 持久化
+    await tester.tap(find.text('深色'));
+    await tester.pumpAndSettle();
+    expect(container.read(themeModeProvider), ThemeMode.dark);
+    expect(container.read(settingsProvider).themeMode, 'dark');
+
+    // 切「浅色」
+    await tester.tap(find.text('浅色'));
+    await tester.pumpAndSettle();
+    expect(container.read(themeModeProvider), ThemeMode.light);
+    expect(container.read(settingsProvider).themeMode, 'light');
   });
 }
