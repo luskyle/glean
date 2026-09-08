@@ -301,10 +301,12 @@ class DictionaryService {
       final rawLevel = map['level'] as String?;
       String? level;
       if (rawLevel != null) {
-        // 数字等级 → N 前缀（5 → N5）；五十音等自定义等级原样保留
-        level = rawLevel.startsWith('N')
-            ? rawLevel
-            : (rawLevel == 'kana' ? rawLevel : 'N$rawLevel');
+        // 纯数字等级 → N 前缀（5 → N5）；kana/A1/入门 等自定义等级原样保留
+        if (RegExp(r'^\d+$').hasMatch(rawLevel)) {
+          level = rawLevel.startsWith('N') ? rawLevel : 'N$rawLevel';
+        } else {
+          level = rawLevel;
+        }
       }
       final entry = DictionaryEntry(
         lang: (map['lang'] as String?) ?? 'ja',

@@ -31,26 +31,43 @@ class ItemRepository {
   final AppDatabase db;
   final DictionaryService _dictionary;
 
-  /// 词库批量导入 words 表（幂等：按 headword+reading 去重）。
+  /// 词库批量导入 words 表（幂等：按 headword+reading 去重；层级纠错）。
   Future<void> importDictionaryEntries(List<DictionaryEntry> entries) async {
     final existing = await db.select(db.words).get();
-    final existingKeys =
-        existing.map((w) => '${w.headword}|${w.reading}').toSet();
+    final byKey = {
+      for (final w in existing) '${w.headword}|${w.reading}': w,
+    };
 
     final batch = <WordsCompanion>[];
+    final fixes = <WordsCompanion>[];
     for (final e in entries) {
-      if (existingKeys.contains('${e.headword}|${e.reading}')) continue;
-      batch.add(
-        WordsCompanion.insert(
-          lang: e.lang,
-          headword: e.headword,
-          reading: Value(e.reading),
-          level: Value(e.level),
-        ),
-      );
+      final key = '${e.headword}|${e.reading}';
+      final current = byKey[key];
+      if (current == null) {
+        batch.add(
+          WordsCompanion.insert(
+            lang: e.lang,
+            headword: e.headword,
+            reading: Value(e.reading),
+            level: Value(e.level),
+          ),
+        );
+      } else if (current.level != e.level) {
+        // 旧版本把 A1/入门 误标为 NA1/N入门：纠错
+        fixes.add(
+          WordsCompanion(
+            id: Value(current.id),
+            level: Value(e.level),
+          ),
+        );
+      }
     }
     if (batch.isNotEmpty) {
       await db.batch((b) => b.insertAll(db.words, batch));
+    }
+    for (final fix in fixes) {
+      await (db.update(db.words)..where((t) => t.id.equals(fix.id.value)))
+          .write(WordsCompanion(level: Value(fix.level.value)));
     }
   }
 
