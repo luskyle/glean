@@ -1,6 +1,7 @@
 /**
  * Service Worker（简洁版）：
- * - 右键「收藏到拾忆」→ 子菜单：选分类后收藏… / 各分类直达
+ * - 右键「收藏到拾忆」→ 子菜单：选分类后收藏… / 收藏当前网页 / 各分类直达
+ * - 菜单上下文：selection（划词）与 page（网页）分别提供对应入口
  * - 菜单在 SW 启动 / 扩展安装更新 / 弹窗打开时重建；
  *   分类列表来自云端快照（popup 刷新后生效）
  * - 写入 WebDAV 后 ping 桌面端 → 即时同步
@@ -23,23 +24,32 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 /** 重建完整菜单（整树）：此刻菜单未在显示中，removeAll 安全。 */
 async function rebuildMenus() {
   chrome.contextMenus.removeAll(() => {
+    // 根菜单：划词与网页上下文都出现
     chrome.contextMenus.create({
       id: 'shiyi-root',
       title: '收藏到拾忆',
-      contexts: ['selection'], // 仅划词（选中文本）时显示
+      contexts: ['selection', 'page'],
     });
+    // 划词 → 弹窗选分类收藏（带选区文本）
     chrome.contextMenus.create({
       id: 'shiyi-with-cat',
       parentId: 'shiyi-root',
       title: '选分类后收藏…',
       contexts: ['selection'],
     });
+    // 未划词（网页）→ 收藏当前网页
+    chrome.contextMenus.create({
+      id: 'shiyi-save-page',
+      parentId: 'shiyi-root',
+      title: '收藏当前网页',
+      contexts: ['page'],
+    });
     chrome.contextMenus.create({
       parentId: 'shiyi-root',
       type: 'separator',
-      contexts: ['selection'],
+      contexts: ['selection', 'page'],
     });
-    // 云端分类直达（拉取失败则只有上面两项+分隔线）
+    // 云端分类直达：划词收藏到分类 / 网页收藏到分类 两组
     (async () => {
       let cols = await fetchCollections();
       if (cols == null) cols = [];
@@ -48,8 +58,14 @@ async function rebuildMenus() {
           chrome.contextMenus.create({
             id: `col-${c.id}`,
             parentId: 'shiyi-root',
-            title: `收藏到「${c.name}」`,
+            title: `划词收藏到「${c.name}」`,
             contexts: ['selection'],
+          });
+          chrome.contextMenus.create({
+            id: `page-col-${c.id}`,
+            parentId: 'shiyi-root',
+            title: `网页收藏到「${c.name}」`,
+            contexts: ['page'],
           });
         } catch (_) {}
       }
@@ -58,6 +74,24 @@ async function rebuildMenus() {
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  const url = tab?.url || '';
+  const title = tab?.title || '';
+
+  // ---- 网页收藏（无划词文本；prompt 存页面标题，answer 存 URL）----
+  if (info.menuItemId === 'shiyi-save-page') {
+    const ok = await savePageWith(url, title, null);
+    notify(ok ? '已收藏当前网页' : '收藏失败：请先在弹窗配置 WebDAV');
+    return;
+  }
+  if (typeof info.menuItemId === 'string' &&
+      info.menuItemId.startsWith('page-col-')) {
+    const collectionId = parseInt(info.menuItemId.slice('page-col-'.length), 10) || null;
+    const ok = await savePageWith(url, title, collectionId);
+    notify(ok ? '已收藏当前网页' : '收藏失败：请先在弹窗配置 WebDAV');
+    return;
+  }
+
+  // ---- 划词收藏 ----
   const text = (info.selectionText || '').trim();
   if (!text) return;
 
@@ -65,15 +99,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     // openPopup 必须在用户手势同步上下文：storage.set 不 await
     chrome.storage.local.set({
       pendingText: text,
-      pendingUrl: tab?.url || '',
-      pendingTitle: tab?.title || '',
+      pendingUrl: url,
+      pendingTitle: title,
     });
     chrome.action.openPopup();
     return;
   }
   if (typeof info.menuItemId === 'string' && info.menuItemId.startsWith('col-')) {
     const collectionId = parseInt(info.menuItemId.slice(4), 10) || null;
-    const ok = await saveWith(text, tab?.url, tab?.title, collectionId);
+    const ok = await saveWith(text, url, title, collectionId);
     notify(ok ? '已收藏到所选分类' : '收藏失败：请先在弹窗配置 WebDAV');
   }
 });
@@ -90,6 +124,23 @@ async function saveWith(text, url, title, collectionId) {
     return true;
   } catch (e) {
     console.error('shiyi save failed', e);
+    return false;
+  }
+}
+
+/** 收藏当前网页：卡面 prompt=页面标题，answer=URL，originalUrl/sourceTitle 同源。 */
+async function savePageWith(url, title, collectionId) {
+  if (!url) return false;
+  try {
+    const cfg = await loadConfig();
+    if (!cfg.url) return false;
+    const snap = (await davGet(cfg)) || emptySnapshot();
+    if (!snap.rows) snap.rows = {};
+    appendCard(snap, title || url, url, { url, title, collectionId });
+    await davPut(cfg, snap);
+    return true;
+  } catch (e) {
+    console.error('shiyi save page failed', e);
     return false;
   }
 }

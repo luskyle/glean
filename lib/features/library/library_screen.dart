@@ -40,6 +40,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final collections = ref.watch(collectionsProvider);
     final links = ref.watch(itemCollectionLinksProvider);
     final stats = ref.watch(collectionStatsProvider);
+    final viewMode = ref.watch(libraryViewModeProvider);
 
     // 标题：选中分组 → 分组名；未选（全部/搜索）→ 收藏
     final selectedName = filter.collectionId == null
@@ -52,7 +53,38 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     return Column(
       children: [
-        IOSLargeTitle(title),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          child: Row(
+            children: [
+              Expanded(child: IOSLargeTitle(title)),
+              // 视图切换：列表 / 网格（Apple Store 卡片式）
+              SegmentedButton<String>(
+                style: const ButtonStyle(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                segments: const [
+                  ButtonSegment(
+                    value: 'list',
+                    icon: Icon(Icons.view_agenda_outlined, size: 18),
+                    tooltip: '列表模式',
+                  ),
+                  ButtonSegment(
+                    value: 'grid',
+                    icon: Icon(Icons.grid_view_outlined, size: 18),
+                    tooltip: '网格模式',
+                  ),
+                ],
+                selected: {viewMode},
+                onSelectionChanged: (v) async {
+                  final mode = v.first;
+                  ref.read(libraryViewModeProvider.notifier).state = mode;
+                  await ref.read(settingsProvider).setLibraryViewMode(mode);
+                },
+              ),
+            ],
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
           child: TextField(
@@ -127,6 +159,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ),
           ),
         ),
+        // ---- 渲染 ----
         Expanded(
           child: items.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -139,12 +172,22 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   subtitle: '侧栏分组 + 或右上角 ⊕ 收藏，内容会出现在对应分组。',
                 );
               }
-              return _groupedList(
-                context,
-                list,
-                collections.value ?? const [],
-                links.value ?? const [],
-                stats.value ?? const {},
+              // 分组内容直接平铺展示（不再依赖展开），按视图模式渲染
+              final view = _GroupedContentView(
+                viewMode: viewMode,
+                items: list,
+                collections: collections.value ?? const [],
+                links: links.value ?? const [],
+                stats: stats.value ?? const {},
+                onRename: _renameCollection,
+                onDelete: _deleteCollection,
+              );
+              return RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(libraryItemsProvider);
+                  ref.invalidate(collectionStatsProvider);
+                },
+                child: view,
               );
             },
           ),
@@ -161,69 +204,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   void _setLang(String l) {
     ref.read(libraryFilterProvider.notifier).state =
         ref.read(libraryFilterProvider).toggleLang(l);
-  }
-
-  Widget _groupedList(
-    BuildContext context,
-    List<ItemWithCard> items,
-    List<CollectionRow> collections,
-    List<ItemCollectionRow> links,
-    Map<int, ({int total, int mastered})> stats,
-  ) {
-    // itemId → 主库
-    final primaryOf = <int, int>{};
-    for (final link in links) {
-      if (link.isPrimary) primaryOf[link.itemId] = link.collectionId;
-    }
-
-    final groups = <CollectionRow, List<ItemWithCard>>{};
-    final ungrouped = <ItemWithCard>[];
-    final colById = {for (final c in collections) c.id: c};
-    for (final item in items) {
-      final cid = primaryOf[item.item.id];
-      final col = cid == null ? null : colById[cid];
-      if (col == null) {
-        ungrouped.add(item);
-      } else {
-        groups.putIfAbsent(col, () => []).add(item);
-      }
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(libraryItemsProvider);
-        ref.invalidate(collectionStatsProvider);
-      },
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 88),
-        children: [
-          for (final entry in groups.entries)
-            _CollectionGroup(
-              collection: entry.key,
-              items: entry.value,
-              stat: stats[entry.key.id],
-              onRename: () => _renameCollection(context, entry.key),
-              onDelete: () => _deleteCollection(context, entry.key),
-            ),
-          if (ungrouped.isNotEmpty)
-            _CollectionGroup(
-              collection: CollectionRow(
-                id: -1,
-                name: '未分类',
-                parentId: null,
-                ownerId: null,
-                isSystem: true,
-                createdAt: DateTime(0),
-              ),
-              items: ungrouped,
-              stat: null,
-              isDefaultGroup: true,
-              onRename: () {},
-              onDelete: () {},
-            ),
-        ],
-      ),
-    );
   }
 
   Future<void> _renameCollection(
@@ -285,87 +265,356 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 }
 
 /// 分组头部：名称 + 卡片数/掌握率 + 菜单（重命名/删除）。
-class _CollectionGroup extends ConsumerWidget {
-  const _CollectionGroup({
-    required this.collection,
+/// 分组内容视图：按主库分组平铺展示（不依赖展开），
+/// 支持列表模式 / 网格模式（Apple Store 卡片风格）。
+class _GroupedContentView extends ConsumerWidget {
+  const _GroupedContentView({
+    required this.viewMode,
     required this.items,
+    required this.collections,
+    required this.links,
+    required this.stats,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  final String viewMode;
+  final List<ItemWithCard> items;
+  final List<CollectionRow> collections;
+  final List<ItemCollectionRow> links;
+  final Map<int, ({int total, int mastered})> stats;
+  final void Function(BuildContext, CollectionRow) onRename;
+  final void Function(BuildContext, CollectionRow) onDelete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return viewMode == 'grid' ? buildGrid(context) : buildList(context);
+  }
+
+  /// item → 主库分组（未关联 → 未分类兜底）。
+  List<(CollectionRow, List<ItemWithCard>)> _groups() {
+    final primaryOf = <int, int>{};
+    for (final link in links) {
+      if (link.isPrimary) primaryOf[link.itemId] = link.collectionId;
+    }
+    final colById = {for (final c in collections) c.id: c};
+    final groups = <int, List<ItemWithCard>>{};
+    final ungrouped = <ItemWithCard>[];
+    for (final item in items) {
+      final cid = primaryOf[item.item.id];
+      final col = cid == null ? null : colById[cid];
+      if (col == null) {
+        ungrouped.add(item);
+      } else {
+        groups.putIfAbsent(col.id, () => []).add(item);
+      }
+    }
+    final result = <(CollectionRow, List<ItemWithCard>)>[];
+    for (final c in collections) {
+      final gi = groups[c.id];
+      if (gi != null && gi.isNotEmpty) {
+        result.add((c, gi));
+      }
+    }
+    if (ungrouped.isNotEmpty) {
+      result.add((
+        CollectionRow(
+          id: -1,
+          name: '未分类',
+          parentId: null,
+          ownerId: null,
+          isSystem: true,
+          createdAt: DateTime(0),
+        ),
+        ungrouped,
+      ));
+    }
+    return result;
+  }
+
+  /// 列表模式：分组头（可操作）+ 卡片直接平铺（无展开门槛）。
+  Widget buildList(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 88),
+      children: [
+        for (final (col, colItems) in _groups()) ...[
+          _GroupHeader(
+            collection: col,
+            stat: stats[col.id],
+            itemCount: colItems.length,
+            onRename: () => onRename(context, col),
+            onDelete: () => onDelete(context, col),
+          ),
+          for (final item in colItems) _ItemListTile(item: item),
+        ],
+      ],
+    );
+  }
+
+  /// 网格模式：分组头 + Apple Store 风格卡片瀑布流。
+  Widget buildGrid(BuildContext context) {
+    // 展平为 (分组, 条目) 序列，分组间用 header 分隔
+    final blocks = <Widget>[];
+    for (final (col, colItems) in _groups()) {
+      blocks.add(
+        _GroupHeader(
+          collection: col,
+          stat: stats[col.id],
+          itemCount: colItems.length,
+          onRename: () => onRename(context, col),
+          onDelete: () => onDelete(context, col),
+        ),
+      );
+      blocks.add(
+        LayoutBuilder(
+          builder: (ctx, cons) {
+            final width = cons.maxWidth;
+            // 参考 Apple Store：窄屏 2 列，宽屏 3~4 列
+            final columns = width >= 1100 ? 4 : (width >= 760 ? 3 : 2);
+            const spacing = 12.0;
+            final cardWidth = (width - spacing * (columns - 1)) / columns;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final item in colItems)
+                  SizedBox(
+                    width: cardWidth,
+                    child: _ItemGridCard(item: item),
+                  ),
+              ],
+            );
+          },
+        ),
+      );
+      blocks.add(const SizedBox(height: 16));
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 88),
+      children: blocks,
+    );
+  }
+}
+
+/// 分组头：名称 + 统计 + 重命名/删除菜单。
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({
+    required this.collection,
     required this.stat,
-    this.isDefaultGroup = false,
+    required this.itemCount,
     required this.onRename,
     required this.onDelete,
   });
 
   final CollectionRow collection;
-  final List<ItemWithCard> items;
   final ({int total, int mastered})? stat;
-  final bool isDefaultGroup;
+  final int itemCount;
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
-  /// 列表副标题：答案 + 来源站点（浏览器划词收藏自动带出处）。
-  String _librarySubtitle(ItemWithCard item) {
+  @override
+  Widget build(BuildContext context) {
+    final isDefault = collection.id == -1;
+    final ratio = stat == null
+        ? 0.0
+        : (stat!.total == 0 ? 0.0 : stat!.mastered / stat!.total);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 14, 4, 10),
+      child: Row(
+        children: [
+          Icon(
+            isDefault ? Icons.folder_outlined : Icons.folder,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              collection.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+          ),
+          Text(
+            stat == null
+                ? '$itemCount 张'
+                : '${stat!.total} 张 · 掌握 ${(ratio * 100).toStringAsFixed(0)}%',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(width: 4),
+          PopupMenuButton<String>(
+            padding: EdgeInsets.zero,
+            iconSize: 18,
+            onSelected: (v) => v == 'rename'
+                ? onRename()
+                : (v == 'delete' ? onDelete() : null),
+            itemBuilder: (_) => [
+              if (!isDefault)
+                const PopupMenuItem(value: 'rename', child: Text('重命名')),
+              if (!isDefault && !collection.isSystem)
+                const PopupMenuItem(value: 'delete', child: Text('删除')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 列表卡片：语言 + 正面 + 答案/来源 + 状态。
+class _ItemListTile extends ConsumerWidget {
+  const _ItemListTile({required this.item});
+
+  final ItemWithCard item;
+
+  String get _subtitle {
     final answer = item.card?.answer ?? '';
     final url = item.item.originalUrl;
     if (url == null) return answer;
     final host = Uri.tryParse(url)?.host ?? '';
-    final source =
-        host.isEmpty ? null : host.replaceFirst(RegExp(r'^www\.'), '');
-    return source == null ? answer : '$answer · $source';
+    final site = host.replaceFirst(RegExp(r'^www\.'), '');
+    return answer.isEmpty ? '$site · 网页' : '$answer · $site';
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ratio = stat == null
-        ? 0.0
-        : (stat!.total == 0 ? 0.0 : stat!.mastered / stat!.total);
-
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ExpansionTile(
-        shape: const Border(),
-        leading: Icon(
-          isDefaultGroup ? Icons.folder_outlined : Icons.folder,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ListTile(
+        leading: LanguageBadge(lang: item.item.lang),
         title: Text(
-          collection.name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          item.card?.prompt ?? '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
         subtitle: Text(
-          stat == null
-              ? '${items.length} 张'
-              : '${stat!.total} 张 · 掌握 ${(ratio * 100).toStringAsFixed(0)}%',
+          _subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        // 菜单：重命名 / 删除（系统库允许改名；默认「未分类」不做任何操作）
-        trailing: PopupMenuButton<String>(
-          onSelected: (v) =>
-              v == 'rename' ? onRename() : (v == 'delete' ? onDelete() : null),
-          itemBuilder: (_) => [
-            if (!isDefaultGroup)
-              const PopupMenuItem(value: 'rename', child: Text('重命名')),
-            if (!isDefaultGroup && !collection.isSystem)
-              const PopupMenuItem(value: 'delete', child: Text('删除')),
-          ],
+        trailing: StatusChip(status: item.item.status),
+        onTap: () => ItemActions.open(context, ref, item),
+      ),
+    );
+  }
+}
+
+/// Apple Store 风格网格卡片：大圆角、留白、语言角标 + 状态、
+/// 正面大字、答案摘要、来源站点、复习间隔。
+class _ItemGridCard extends ConsumerWidget {
+  const _ItemGridCard({required this.item});
+
+  final ItemWithCard item;
+
+  String get _sourceHost {
+    final url = item.item.originalUrl;
+    if (url == null) return '';
+    final host = Uri.tryParse(url)?.host ?? '';
+    return host.replaceFirst(RegExp(r'^www\.'), '');
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final card = item.card;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      color: scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: InkWell(
+        onTap: () => ItemActions.open(context, ref, item),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 顶部：语言角标 / 卡种 + 状态徽标
+              Row(
+                children: [
+                  LanguageBadge(lang: item.item.lang),
+                  const SizedBox(width: 6),
+                  Text(
+                    kindLabel(card?.kind ?? 'word'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  StatusChip(status: item.item.status),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // 正面（大字）
+              Text(
+                card?.prompt ?? item.item.note ?? '',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 19,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 背面 / 摘要
+              if ((card?.answer ?? '').isNotEmpty)
+                Text(
+                  card!.answer,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              const Spacer(),
+              const SizedBox(height: 8),
+              // 底部：来源 + 复习间隔
+              Row(
+                children: [
+                  if (_sourceHost.isNotEmpty) ...[
+                    Icon(Icons.language,
+                        size: 12, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        _sourceHost,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                  ] else
+                    const Spacer(),
+                  Text(
+                    card != null && card.intervalDays > 0
+                        ? '${card.intervalDays} 天后'
+                        : '待复习',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        children: [
-          for (final item in items)
-            ListTile(
-              leading: LanguageBadge(lang: item.item.lang),
-              title: Text(
-                item.card?.prompt ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-              subtitle: Text(
-                _librarySubtitle(item),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: StatusChip(status: item.item.status),
-              onTap: () => ItemActions.open(context, ref, item),
-            ),
-        ],
       ),
     );
   }

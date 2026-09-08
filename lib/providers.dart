@@ -157,6 +157,11 @@ final libraryFilterProvider = StateProvider<LibraryFilter>((ref) {
   return const LibraryFilter();
 });
 
+/// 记忆库视图模式：list | grid（初始自设置，切换时持久化）。
+final libraryViewModeProvider = StateProvider<String>((ref) {
+  return ref.watch(settingsProvider).libraryViewMode;
+});
+
 final libraryItemsProvider = StreamProvider<List<ItemWithCard>>((ref) {
   final filter = ref.watch(libraryFilterProvider);
   return ref.watch(itemRepositoryProvider).watchLibrary(
