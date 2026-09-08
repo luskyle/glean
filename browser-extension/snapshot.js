@@ -36,6 +36,15 @@ async function davPut(cfg, payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`写入云端失败（HTTP ${res.status}）`);
+  // 通知本机拾忆桌面端立即同步（实时效果；未运行桌面端时静默）
+  pingDesktop();
+}
+
+/** 通知桌面端拾忆有新版数据（本地 9797 端口，秒级同步用）。 */
+function pingDesktop() {
+  try {
+    fetch('http://127.0.0.1:9797/ping', { mode: 'no-cors' }).catch(() => {});
+  } catch (_) {}
 }
 
 /** 生成不冲突的 id（负数，避开 App 的正值自增 id）。 */

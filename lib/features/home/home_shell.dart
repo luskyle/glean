@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/analytics/analytics_service.dart';
+import '../../data/sync/local_notify_server.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
 import '../inbox/inbox_screen.dart';
@@ -37,15 +40,25 @@ class _HomeShellState extends ConsumerState<HomeShell>
   final _searchCtrl = TextEditingController();
 
   ClipboardWatcher? _watcher;
+  Timer? _syncTimer;
+  final LocalNotifyServer _notifyServer = LocalNotifyServer();
+  StreamSubscription<void>? _notifySub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ref.read(analyticsProvider).track(AnalyticsEvents.appOpen);
+    // 本地通知服务：浏览器插件等本机写入方收藏后实时触发同步
+    _notifyServer.start();
+    _notifySub = _notifyServer.onNotify.listen((_) => _quietSync());
     // 多端云盘同步：启动时拉取远端并合并（静默，失败不影响使用）
-    ref.read(syncServiceProvider).syncNow().then((err) {
-      if (err != null) debugPrint('启动同步跳过：$err');
+    _quietSync();
+    // 前台周期自动同步（浏览器插件等其他端写入后可自动出现）
+    _syncTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        _quietSync();
+      }
     });
     // 词库引导：载入 JLPT 词库资产（内存索引 + words 表），失败静默
     ref.read(dictionaryBootstrapProvider.future).catchError((_) {});
@@ -59,9 +72,19 @@ class _HomeShellState extends ConsumerState<HomeShell>
     }
   }
 
+  /// 静默安全同步（拉取合并 → 推送），失败仅打日志。
+  void _quietSync() {
+    ref.read(syncServiceProvider).syncNow().then((err) {
+      if (err != null) debugPrint('自动同步跳过：$err');
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _syncTimer?.cancel();
+    _notifySub?.cancel();
+    _notifyServer.dispose();
     _searchCtrl.dispose();
     _watcher?.dispose();
     _watcher = null;
@@ -74,6 +97,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
     switch (state) {
       case AppLifecycleState.resumed:
         analytics.track(AnalyticsEvents.appResume);
+        _quietSync(); // 回到前台立即拉取其他端的新收藏
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
