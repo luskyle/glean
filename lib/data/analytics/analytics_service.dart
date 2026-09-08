@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -58,14 +59,14 @@ class AnalyticsService {
       ...?props,
     };
     _buffer.add(row);
-    _write(row);
+    unawaited(_write(row));
   }
 
-  void _write(Map<String, Object?> row) {
+  Future<void> _write(Map<String, Object?> row) async {
     // 上报占位：接入自建轻量服务器 / Supabase 后在此时发送 JSON。
     // TODO(analytics): POST $serverUrl/events（文本日志，绝不包含媒体路径/正文内容）
     try {
-      _ensureFile(); // 允许 fire-and-forget
+      await _ensureFile(); // 首事件需先建文件，避免丢事件
       _file?.writeAsStringSync(
         '${jsonEncode(row)}\n',
         mode: FileMode.append,

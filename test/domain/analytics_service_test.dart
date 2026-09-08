@@ -41,9 +41,21 @@ void main() {
       svc.track(AnalyticsEvents.appOpen);
       svc.track(AnalyticsEvents.itemCollected, props: {'source': 'manual'});
 
-      final files = dir.listSync().whereType<File>().toList();
-      expect(files, hasLength(1));
-      final lines = files.single.readAsLinesSync();
+      // 等待异步落盘完成
+      File? file;
+      for (var i = 0; i < 50; i++) {
+        final f = dir.listSync().whereType<File>().toList();
+        file = f.isEmpty ? null : f.single;
+        if (file != null &&
+            file.existsSync() &&
+            file.readAsLinesSync().length == 2) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+
+      expect(file, isNotNull);
+      final lines = file!.readAsLinesSync();
       expect(lines, hasLength(2));
       expect(lines[0], contains('"event":"app_open"'));
       expect(lines[1], contains('"source":"manual"'));
