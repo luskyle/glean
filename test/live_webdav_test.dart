@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:drift/drift.dart' as drift;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiyi/data/database/database.dart';
 import 'package:shiyi/data/sync/cloud_drive.dart';
