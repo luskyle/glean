@@ -39,7 +39,6 @@ class ItemRepository {
 
     final batch = <WordsCompanion>[];
     for (final e in entries) {
-      if (e.lang != 'ja') continue;
       if (existingKeys.contains('${e.headword}|${e.reading}')) continue;
       batch.add(
         WordsCompanion.insert(
@@ -55,6 +54,23 @@ class ItemRepository {
     }
   }
 
+  /// 指定语言中尚未学习（未成卡）的词条（主动学习数据源）。
+  Future<List<WordRow>> unstudiedWords({
+    required String lang,
+    int limit = 20,
+  }) async {
+    final used = await (db.selectOnly(db.cards)
+          ..addColumns([db.cards.wordId])
+          ..where(db.cards.wordId.isNotNull()))
+        .get();
+    final usedIds =
+        used.map((r) => r.read(db.cards.wordId)).whereType<int>().toSet();
+
+    final words =
+        await (db.select(db.words)..where((t) => t.lang.equals(lang))).get();
+    return words.where((w) => !usedIds.contains(w.id)).take(limit).toList();
+  }
+
   /// 全部卡片数（免费额度上限判定用）。
   Future<int> cardCount() async {
     final query = db.selectOnly(db.items)
@@ -64,8 +80,9 @@ class ItemRepository {
     return row.read(countAll()) ?? 0;
   }
 
-  /// 手录创建：成卡 + 条目（status=learning，首次复习排期明天）。
-  /// 词条类命中离线词库 → 自动补释义/读音并关联 word 行（官方词库路径）。
+  /// 手录/主动学习创建：成卡 + 条目（status=learning，首次复习排期明天）。
+  /// 词条类命中离线词库 → 自动补释义/读音并关联 word 行（官方词库路径）；
+  /// [wordId] 显式传入时直接关联（主动学习从词库取词的路径）。
   Future<int> createManualCard({
     required String prompt,
     required String answer,
@@ -75,13 +92,13 @@ class ItemRepository {
     String? note,
     String source = 'manual',
     int? collectionId,
+    int? wordId,
     DateTime? now,
   }) async {
     final ts = now ?? DateTime.now();
 
     // 词条类：先查离线词库，命中则建 word 行并关联（本地优先原则）
-    int? wordId;
-    if (kind == 'word') {
+    if (kind == 'word' && wordId == null) {
       final hits = _dictionary.lookup(prompt);
       final hit = hits.isNotEmpty ? hits.first : null;
       if (hit != null) {

@@ -90,6 +90,12 @@ class DesktopSidebar extends ConsumerWidget {
                     selected: activeTab == 2 && _isAllView(ref),
                     onTap: () => _openLibraryAll(ref),
                   ),
+                  _SidebarRow(
+                    icon: Icons.translate,
+                    label: '学习',
+                    selected: activeTab == 3,
+                    onTap: () => onSelectTab(3),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

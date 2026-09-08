@@ -10,6 +10,7 @@ import '../library/library_screen.dart';
 import '../review/curve_screen.dart';
 import '../review/review_screen.dart';
 import '../settings/settings_screen.dart';
+import '../study/study_screen.dart';
 import 'desktop_sidebar.dart';
 
 /// 当前 Tab（默认落点 = 复习页，见设计原则 2）。
@@ -29,7 +30,7 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
-  static const _titles = ['收件箱', '今日复习', '记忆库'];
+  static const _titles = ['收件箱', '今日复习', '记忆库', '学习'];
   static const _wideBreakpoint = 900.0;
 
   /// 顶栏全局搜索框控制器（宽屏）。
@@ -184,6 +185,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
                           InboxScreen(active: tabIndex == 0),
                           ReviewScreen(active: tabIndex == 1),
                           LibraryScreen(active: tabIndex == 2),
+                          StudyScreen(active: tabIndex == 3),
                         ],
                       ),
                     ),
@@ -300,6 +302,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
           InboxScreen(active: tabIndex == 0),
           ReviewScreen(active: tabIndex == 1),
           LibraryScreen(active: tabIndex == 2),
+          StudyScreen(active: tabIndex == 3),
         ],
       ),
       floatingActionButton: isInbox
@@ -332,6 +335,11 @@ class _HomeShellState extends ConsumerState<HomeShell>
             icon: Icon(Icons.collections_bookmark_outlined),
             selectedIcon: Icon(Icons.collections_bookmark),
             label: '记忆库',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.translate),
+            selectedIcon: Icon(Icons.translate),
+            label: '学习',
           ),
         ],
       ),

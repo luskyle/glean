@@ -240,6 +240,9 @@ class DictionaryService {
 
   static const _assetPath = 'lib/assets/dictionary/jlpt.json';
 
+  /// 附加语言包（英语/韩语/法语/西班牙语示例；Pro 解锁）。
+  static const _extraPath = 'lib/assets/dictionary/extra_langs.json';
+
   final Map<String, List<DictionaryEntry>> _index = {};
   bool _loadedFromAsset = false;
 
@@ -254,7 +257,23 @@ class DictionaryService {
   List<DictionaryEntry> get loadedEntries =>
       _index.values.expand((l) => l).toList();
 
-  /// 从 assets 载入词库 JSON（JLPT 词条 + 五十音）。失败静默（有样例兜底）。
+  /// 按语言统计词条数（学习页语言包展示）。
+  Map<String, int> countsByLang() {
+    final counts = <String, int>{};
+    for (final list in _index.values) {
+      for (final e in list) {
+        counts[e.lang] = (counts[e.lang] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
+  /// 指定语言下的全部词条（学习数据源）。
+  List<DictionaryEntry> entriesForLang(String lang) {
+    return _index.values.expand((l) => l).where((e) => e.lang == lang).toList();
+  }
+
+  /// 从 assets 载入词库 JSON（JLPT 词条 + 附加语言包）。失败静默（有样例兜底）。
   Future<void> loadFromAsset() async {
     if (_loadedFromAsset) return;
     try {
@@ -263,6 +282,11 @@ class DictionaryService {
     } catch (_) {
       // 词库缺失/加载失败不影响使用（样例词库兜底）
     }
+    try {
+      final extra = await rootBundle.loadString(_extraPath);
+      loadJson(extra);
+    } catch (_) {}
+    if (loadedCount > kSampleDictionary.length) _loadedFromAsset = true;
   }
 
   /// 解析词库 JSON 并合并进内存索引（可测试）。
@@ -283,7 +307,7 @@ class DictionaryService {
             : (rawLevel == 'kana' ? rawLevel : 'N$rawLevel');
       }
       final entry = DictionaryEntry(
-        lang: 'ja',
+        lang: (map['lang'] as String?) ?? 'ja',
         headword: headword,
         reading: map['reading'] as String?,
         meaning: map['meaning'] as String?,
