@@ -1,8 +1,10 @@
 /**
  * Service Worker：
  * - 右键「收藏到拾忆」→ 子菜单：选分类后收藏… / 各分类直达
- * - 菜单中的分类列表来自云端快照（桌面新增分类后自动可见）
+ * - 菜单中的分类列表来自云端快照（桌面新增/删除分类后自动可见）
  *   （menu 在 SW 启动时与弹窗刷新时重建）
+ * - 菜单树是持久化缓存：靠 chrome.alarms 定时唤醒比对云端分类签名，
+ *   分类变化时自动重建（无需手动点扩展刷新）
  * - 写入 WebDAV 后 ping 桌面端 → 即时同步
  */
 importScripts('snapshot.js');
@@ -10,6 +12,15 @@ importScripts('snapshot.js');
 // SW 每次被唤醒（点图标/消息/启动）都重建右键菜单：
 // 解压扩展的「刷新」不会触发 onInstalled，只有运行期执行 create 才生效。
 rebuildMenus();
+
+// 分类签名（id|name 拼接）：云端分类未变则不重建，避免菜单闪烁。
+let _lastMenuSignature = '';
+
+// 定时唤醒：桌面端增删分类后自动同步到右键菜单（默认 1 分钟内）。
+chrome.alarms.create('shiyi-sync-menus', { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'shiyi-sync-menus') rebuildMenus();
+});
 
 chrome.runtime.onInstalled.addListener(() => rebuildMenus());
 chrome.runtime.onStartup.addListener(() => rebuildMenus());
@@ -21,6 +32,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 async function rebuildMenus() {
+  let cols;
+  try {
+    cols = await fetchCollections();
+  } catch (_) {
+    return; // 网络异常：保留现有菜单
+  }
+  cols = cols || [];
+  const sig = cols.map((c) => `${c.id}:${c.name}`).join('|');
+  // 首次（_lastMenuSignature 为空哨兵）始终创建；之后仅在签名变化时重建
+  if (_lastMenuSignature !== '' && sig === _lastMenuSignature) return;
+  _lastMenuSignature = sig;
+
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'shiyi-root',
@@ -39,17 +62,14 @@ async function rebuildMenus() {
       contexts: ['selection'],
     });
     // 云端分类直达（异步拉取后追加；失败则只有上面一项）
-    (async () => {
-      const cols = await fetchCollections();
-      for (const c of cols) {
-        chrome.contextMenus.create({
-          id: `col-${c.id}`,
-          parentId: 'shiyi-root',
-          title: `收藏到「${c.name}」`,
-          contexts: ['selection'],
-        });
-      }
-    })();
+    for (const c of cols) {
+      chrome.contextMenus.create({
+        id: `col-${c.id}`,
+        parentId: 'shiyi-root',
+        title: `收藏到「${c.name}」`,
+        contexts: ['selection'],
+      });
+    }
   });
 }
 
