@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../data/database/database.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
+import '../library/media_library_screen.dart';
 
 /// iOS 风格侧边栏（HIG Sidebar）：大标题 + 分组导航 + 底部设置。
 ///
@@ -78,6 +79,11 @@ class DesktopSidebar extends ConsumerWidget {
                     selected: activeTab == 2,
                     onTap: () => onSelectTab(2),
                   ),
+                  _SidebarRow(
+                    icon: Icons.photo_library_outlined,
+                    label: '素材库',
+                    onTap: () => _openMediaLibrary(context),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -147,6 +153,12 @@ class DesktopSidebar extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _openMediaLibrary(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MediaLibraryScreen()),
     );
   }
 

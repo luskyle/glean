@@ -6,7 +6,7 @@ import 'tables.dart';
 
 part 'database.g.dart';
 
-const kSchemaVersion = 3;
+const kSchemaVersion = 4;
 
 /// 拾忆主库（drift/SQLite）。
 ///
@@ -22,6 +22,7 @@ const kSchemaVersion = 3;
     ItemCollections,
     ItemTags,
     SyncDeletions,
+    MediaAssets,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -44,6 +45,10 @@ class AppDatabase extends _$AppDatabase {
           await _seedSystemCollections();
         },
         onUpgrade: (m, from, to) async {
+          if (from < 4) {
+            await m.createTable(mediaAssets);
+            await m.addColumn(items, items.mediaAssetId);
+          }
           if (from < 3) {
             await m.addColumn(items, items.sourceTitle);
           }

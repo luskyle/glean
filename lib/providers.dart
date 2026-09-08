@@ -8,6 +8,7 @@ import 'data/analytics/analytics_service.dart';
 import 'data/database/database.dart';
 import 'data/dictionary/dictionary_service.dart';
 import 'data/repositories/item_repository.dart';
+import 'data/repositories/media_repository.dart';
 import 'data/repositories/review_repository.dart';
 import 'data/settings/settings_store.dart';
 import 'data/speech/speech_service.dart';
@@ -67,6 +68,16 @@ final sharedPrefsProvider = Provider<SharedPreferences>((ref) {
 
 final itemRepositoryProvider = Provider<ItemRepository>((ref) {
   return ItemRepository(ref.watch(databaseProvider));
+});
+
+/// 本地素材库（链接不导入；仅本地使用）。
+final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
+  return MediaRepository(ref.watch(databaseProvider));
+});
+
+/// 素材列表（新在前）。
+final mediaAssetsProvider = FutureProvider<List<MediaAssetRow>>((ref) {
+  return ref.watch(mediaRepositoryProvider).all();
 });
 
 final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {

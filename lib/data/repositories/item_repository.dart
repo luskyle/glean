@@ -197,6 +197,7 @@ class ItemRepository {
     String source = 'manual',
     int? collectionId,
     int? wordId,
+    int? mediaAssetId,
     DateTime? now,
   }) async {
     final ts = now ?? DateTime.now();
@@ -237,6 +238,7 @@ class ItemRepository {
             note: Value(note),
             lang: Value(lang),
             status: const Value('learning'),
+            mediaAssetId: Value(mediaAssetId),
             createdAt: ts,
           ),
         );

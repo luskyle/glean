@@ -8,6 +8,7 @@ import '../../data/database/database.dart';
 import '../../data/repositories/item_repository.dart';
 import '../../providers.dart';
 import '../../shared/status_chip.dart';
+import '../library/media_library_screen.dart';
 
 /// 条目详情与操作（收件箱 / 记忆库共用）：
 /// - 已成卡：查看/编辑卡面、删除
@@ -129,6 +130,11 @@ class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
                 widget.item.item.sourceTitle != null) ...[
               const SizedBox(height: 12),
               _SourceRow(item: widget.item.item),
+            ],
+            // 本地素材（记忆教练：链接素材库，回忆锚点）
+            if (widget.item.item.mediaAssetId != null) ...[
+              const SizedBox(height: 12),
+              SourceMediaView(assetId: widget.item.item.mediaAssetId!),
             ],
             const SizedBox(height: 16),
             TextField(

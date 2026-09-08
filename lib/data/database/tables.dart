@@ -57,6 +57,9 @@ class Items extends Table {
   TextColumn get mediaPath => text().nullable()();
   TextColumn get originalUrl => text().nullable()();
 
+  /// 链接的本地素材（素材库引用，不随云同步；仅本地使用）
+  IntColumn get mediaAssetId => integer().nullable()();
+
   /// 网页摘录来源页标题（Phase 1：划词收藏自动带出处）
   TextColumn get sourceTitle => text().nullable()();
 
@@ -133,4 +136,26 @@ class SyncDeletions extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {entityTable, entityId};
+}
+
+/// 本地素材库（记忆教练：链接不导入）：
+/// 仅索引本地文件路径，绝不复制媒体；素材不参与云同步，仅本地使用。
+@DataClassName('MediaAssetRow')
+class MediaAssets extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 来源：folder（桌面目录链接）| gallery（移动端相册引用）
+  TextColumn get source => text().withDefault(const Constant('folder'))();
+
+  /// type: image | video
+  TextColumn get type => text().withDefault(const Constant('image'))();
+
+  /// 本地绝对路径（folder）或相册 asset 标识（gallery）
+  TextColumn get path => text()();
+
+  /// 文件名（展示用）
+  TextColumn get name => text()();
+
+  IntColumn get sizeBytes => integer().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
 }

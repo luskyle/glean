@@ -27,7 +27,7 @@ class SyncSnapshot {
       'exported_at': DateTime.now().toIso8601String(),
       'rows': <String, Object?>{
         'collections': collections.map((c) => c.toJson()).toList(),
-        'items': items.map((i) => i.toJson()).toList(),
+        'items': items.map((i) => i.toJson()..remove('mediaAssetId')).toList(),
         'cards': cards.map((c) => c.toJson()).toList(),
         'review_logs': logs.map((l) => l.toJson()).toList(),
         'item_collections': links.map((l) => l.toJson()).toList(),

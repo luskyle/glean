@@ -8,6 +8,7 @@ import '../../shared/empty_state.dart';
 import '../../shared/ios_large_title.dart';
 import '../../shared/status_chip.dart';
 import '../inbox/item_actions.dart';
+import 'media_library_screen.dart';
 
 /// 分组内容：展示某个分组的全部成卡。
 /// 搜索（全文）/ 筛选（语言、状态）/ 分组（库 + 未分类兜底）。
@@ -551,28 +552,37 @@ class _ItemGridCard extends ConsumerWidget {
                   StatusChip(status: item.item.status),
                 ],
               ),
-              const SizedBox(height: 14),
-              // 正面（大字）
+              // 素材预览（记忆教练：链接本地素材，回忆锚点）
+              if (item.item.mediaAssetId != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 96,
+                  width: double.infinity,
+                  child: SourceMediaView(assetId: item.item.mediaAssetId!),
+                ),
+              ],
+              const SizedBox(height: 12),
+              // 正面（大字，方形卡片空间紧凑限 2 行）
               Text(
                 card?.prompt ?? item.item.note ?? '',
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 19,
-                  height: 1.3,
+                  fontSize: 17,
+                  height: 1.35,
                   fontWeight: FontWeight.w700,
                   color: scheme.onSurface,
                 ),
               ),
-              const SizedBox(height: 8),
-              // 背面 / 摘要
+              const SizedBox(height: 6),
+              // 背面 / 摘要（1 行）
               if ((card?.answer ?? '').isNotEmpty)
                 Text(
                   card!.answer,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     height: 1.4,
                     color: scheme.onSurfaceVariant,
                   ),
