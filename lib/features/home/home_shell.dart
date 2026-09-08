@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/analytics/analytics_service.dart';
 import '../../data/sync/local_notify_server.dart';
+import '../../domain/tagging/language.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
-import '../inbox/inbox_screen.dart';
 import '../library/library_screen.dart';
 import '../review/curve_screen.dart';
 import '../review/review_screen.dart';
@@ -17,7 +17,7 @@ import '../study/study_screen.dart';
 import 'desktop_sidebar.dart';
 
 /// 当前 Tab（默认落点 = 复习页，见设计原则 2）。
-final homeTabIndexProvider = StateProvider<int>((ref) => 1);
+final homeTabIndexProvider = StateProvider<int>((ref) => 0);
 
 /// 外壳：Cubox 式响应式布局。
 ///
@@ -33,7 +33,7 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
-  static const _titles = ['收件箱', '今日复习', '记忆库', '学习'];
+  static const _titles = ['今日复习', '记忆库', '学习'];
   static const _wideBreakpoint = 900.0;
 
   /// 顶栏全局搜索框控制器（宽屏）。
@@ -142,14 +142,23 @@ class _HomeShellState extends ConsumerState<HomeShell>
           label: '收藏',
           onPressed: () async {
             final repo = ref.read(itemRepositoryProvider);
-            await repo.createInboxItem(text: text, source: 'clipboard');
+            // 直接成卡（不再经过收件箱）：明天首复，来源记为剪贴板
+            await repo.createManualCard(
+              prompt: text.trim(),
+              answer: '（待补充答案）',
+              kind: text.trim().length > 20 ? 'idea' : 'word',
+              lang: langCodeOf(detectLang(text)),
+              source: 'clipboard',
+            );
             ref.read(analyticsProvider).track(
               AnalyticsEvents.itemCollected,
               props: {'source': 'clipboard'},
             );
-            ref.invalidate(inboxItemsProvider);
+            ref.invalidate(libraryItemsProvider);
+            ref.invalidate(reviewOverviewProvider);
+            ref.invalidate(quotaProvider);
             messenger.showSnackBar(
-              const SnackBar(content: Text('已收进收件箱，稍后整理成卡')),
+              const SnackBar(content: Text('已收藏，明天开始复习')),
             );
           },
         ),
@@ -210,10 +219,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
                       child: IndexedStack(
                         index: tabIndex,
                         children: [
-                          InboxScreen(active: tabIndex == 0),
-                          ReviewScreen(active: tabIndex == 1),
-                          LibraryScreen(active: tabIndex == 2),
-                          StudyScreen(active: tabIndex == 3),
+                          ReviewScreen(active: tabIndex == 0),
+                          LibraryScreen(active: tabIndex == 1),
+                          StudyScreen(active: tabIndex == 2),
                         ],
                       ),
                     ),
@@ -291,10 +299,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
     );
   }
 
-  // ---- 窄屏（移动三 Tab）----
+  // ---- 窄屏（移动 Tab）----
 
   Widget _buildNarrow(BuildContext context, int tabIndex) {
-    final isInbox = tabIndex == 0;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -325,21 +332,18 @@ class _HomeShellState extends ConsumerState<HomeShell>
       body: IndexedStack(
         index: tabIndex,
         children: [
-          InboxScreen(active: tabIndex == 0),
-          ReviewScreen(active: tabIndex == 1),
-          LibraryScreen(active: tabIndex == 2),
-          StudyScreen(active: tabIndex == 3),
+          ReviewScreen(active: tabIndex == 0),
+          LibraryScreen(active: tabIndex == 1),
+          StudyScreen(active: tabIndex == 2),
         ],
       ),
-      floatingActionButton: isInbox
-          ? FloatingActionButton.extended(
-              onPressed: () => _openAddSheet(),
-              backgroundColor: scheme.primary,
-              foregroundColor: scheme.onPrimary,
-              icon: const Icon(Icons.add),
-              label: const Text('收藏'),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openAddSheet(),
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        icon: const Icon(Icons.add),
+        label: const Text('收藏'),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tabIndex,
         onDestinationSelected: (i) {
@@ -347,11 +351,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
           ref.read(homeTabIndexProvider.notifier).state = i;
         },
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.inbox_outlined),
-            selectedIcon: Icon(Icons.inbox),
-            label: '收件箱',
-          ),
           NavigationDestination(
             icon: Icon(Icons.school_outlined),
             selectedIcon: Icon(Icons.school),

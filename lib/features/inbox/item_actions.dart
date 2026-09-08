@@ -79,7 +79,6 @@ class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
         );
     if (mounted) {
       Navigator.of(context).pop();
-      ref.invalidate(inboxItemsProvider);
       ref.invalidate(libraryItemsProvider);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已保存')));
@@ -90,7 +89,6 @@ class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
     await ref.read(itemRepositoryProvider).deleteItem(widget.item.item.id);
     if (mounted) {
       Navigator.of(context).pop();
-      ref.invalidate(inboxItemsProvider);
       ref.invalidate(libraryItemsProvider);
       ref.invalidate(reviewOverviewProvider);
       ref.invalidate(quotaProvider);
@@ -211,7 +209,6 @@ class _ConfirmCardSheetState extends ConsumerState<_ConfirmCardSheet> {
     );
     if (mounted) {
       Navigator.of(context).pop();
-      ref.invalidate(inboxItemsProvider);
       ref.invalidate(reviewOverviewProvider);
       ref.invalidate(quotaProvider);
       ScaffoldMessenger.of(context).showSnackBar(

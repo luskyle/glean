@@ -134,6 +134,44 @@ class ItemRepository {
     return counts;
   }
 
+  /// 旧数据对账：取消收件箱后，遗留 inbox 条目升级为学习卡（无孤儿）。
+  /// - 已有卡 → 状态改 learning（正常进复习）
+  /// - 无卡（旧剪贴板待归类）→ 用备注文本自动成卡
+  Future<void> upgradeLegacyInbox({DateTime? now}) async {
+    final ts = now ?? DateTime.now();
+    final inbox = await (db.select(db.items)
+          ..where((t) => t.status.equals('inbox')))
+        .get();
+    for (final it in inbox) {
+      if (it.cardId != null) {
+        await (db.update(db.items)..where((t) => t.id.equals(it.id)))
+            .write(const ItemsCompanion(status: Value('learning')));
+        continue;
+      }
+      final text = it.note ?? '';
+      if (text.trim().isEmpty) continue;
+      final lang = it.lang ?? 'other';
+      final kind = text.trim().length > 20 ? 'idea' : 'word';
+      final cardId = await db.into(db.cards).insert(
+            CardsCompanion.insert(
+              kind: Value(kind),
+              prompt: text.trim(),
+              answer: '（待补充答案）',
+              lang: Value(lang),
+              dueAt: firstReviewDueAt(ts),
+              createdAt: it.createdAt,
+            ),
+          );
+      await (db.update(db.items)..where((t) => t.id.equals(it.id)))
+          .write(ItemsCompanion(
+        cardId: Value(cardId),
+        status: const Value('learning'),
+        note: const Value(null),
+        lang: Value(lang),
+      ));
+    }
+  }
+
   /// 全部卡片数（免费额度上限判定用）。
   Future<int> cardCount() async {
     final query = db.selectOnly(db.items)

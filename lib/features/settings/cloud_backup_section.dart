@@ -76,8 +76,7 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
           await ref.read(settingsProvider).markBackupNow();
         }
         // 同步/恢复都刷新页面数据（拉取的内容立刻可见）
-        ref.invalidate(inboxItemsProvider);
-        ref.invalidate(libraryItemsProvider);
+          ref.invalidate(libraryItemsProvider);
         ref.invalidate(reviewOverviewProvider);
         ref.invalidate(quotaProvider);
         ref.invalidate(collectionsProvider);

@@ -104,7 +104,7 @@ function appendInbox(snapshot, text, { url, note, collectionId }) {
     originalUrl: url || null,
     note: note || null,
     lang: guessLang(text),
-    status: 'inbox', // 待整理（App 收件箱）
+    status: 'learning', // 直接入复习队列（无收件箱中转）
     createdAt: now,
   });
   if (collectionId) {

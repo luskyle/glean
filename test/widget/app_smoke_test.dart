@@ -44,15 +44,15 @@ void main() {
     expect(find.text('今日复习'), findsOneWidget);
     expect(find.text('今天还没有复习任务'), findsOneWidget);
 
-    // 切到收件箱
-    await tester.tap(find.text('收件箱'));
-    await tester.pumpAndSettle();
-    expect(find.text('收件箱还空着'), findsOneWidget);
-
     // 切到记忆库
     await tester.tap(find.text('记忆库'));
     await tester.pumpAndSettle();
     expect(find.text('记忆库还空着'), findsOneWidget);
+
+    // 切到学习
+    await tester.tap(find.text('学习'));
+    await tester.pumpAndSettle();
+    expect(find.text('日语'), findsWidgets); // 学习页语言包列表
   });
 
   testWidgets('空库时复习页显示引导，且不显示开始按钮', (tester) async {

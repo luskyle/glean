@@ -101,7 +101,6 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
 
     if (mounted) {
       Navigator.of(context).pop();
-      ref.invalidate(inboxItemsProvider);
       ref.invalidate(libraryItemsProvider);
       ref.invalidate(quotaProvider);
       ScaffoldMessenger.of(context).showSnackBar(

@@ -84,6 +84,17 @@ void main() {
     expect(LanguageCatalog.unlocked('ja', isPro: false), isTrue);
   });
 
+  test('默认分类：工作/学习/未分类（系统，幂等补齐）', () async {
+    final cols = await db.select(db.collections).get();
+    final names = cols.where((c) => c.isSystem).map((c) => c.name).toSet();
+    expect(names, containsAll(['工作', '学习', '未分类']));
+
+    // 幂等：再确保一次不重复插入
+    await db.ensureDefaultCollections();
+    final again = await db.select(db.collections).get();
+    expect(again.length, cols.length);
+  });
+
   test('词库导入支持多语言；unstudiedWords 返回未学词', () async {
     // 模拟导入韩语示例包
     await repo.importDictionaryEntries(const [

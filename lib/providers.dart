@@ -77,14 +77,16 @@ final dictionaryServiceProvider = Provider<DictionaryService>((ref) {
   return DictionaryService();
 });
 
-/// 词库引导：载入词库资产到内存索引 + 批量导入 words 表（启动时执行一次，
-/// 幂等；失败静默，有内置样例兜底）。
+/// 词库引导：载入词库资产到内存索引 + 批量导入 words 表 + 数据对账
+/// （默认分类补齐、遗留收件箱条目升级），启动时执行一次。
 final dictionaryBootstrapProvider = FutureProvider<void>((ref) async {
   final svc = ref.read(dictionaryServiceProvider);
   final repo = ref.read(itemRepositoryProvider);
   try {
     await svc.loadFromAsset();
     await repo.importDictionaryEntries(svc.loadedEntries);
+    await ref.read(databaseProvider).ensureDefaultCollections();
+    await repo.upgradeLegacyInbox();
   } catch (_) {
     // 词库不可用不影响核心流程（样例词库兜底）
   }
@@ -93,11 +95,6 @@ final dictionaryBootstrapProvider = FutureProvider<void>((ref) async {
 // ---------------------------------------------------------------------------
 // 收件箱 / 记忆库
 // ---------------------------------------------------------------------------
-
-/// 收件箱流（待归类 + 待学习）。
-final inboxItemsProvider = StreamProvider<List<ItemWithCard>>((ref) {
-  return ref.watch(itemRepositoryProvider).watchInbox();
-});
 
 /// 记忆库筛选参数。
 class LibraryFilter {

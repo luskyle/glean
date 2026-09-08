@@ -13,7 +13,15 @@ const kSchemaVersion = 1;
 /// 打开方式：`driftDatabase(name: 'shiyi')`（drift_flutter 一站式，
 /// 自带 sqlite3_flutter_libs 原生库与 path 处理；测试中改为内存库）。
 @DriftDatabase(
-  tables: [Words, Cards, Items, ReviewLogs, Collections, ItemCollections, ItemTags],
+  tables: [
+    Words,
+    Cards,
+    Items,
+    ReviewLogs,
+    Collections,
+    ItemCollections,
+    ItemTags
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
@@ -42,33 +50,27 @@ class AppDatabase extends _$AppDatabase {
       );
 
   Future<void> _seedSystemCollections() async {
-    final now = DateTime.now();
-    await batch((b) {
-      b.insertAll(
-        collections,
-        [
-          CollectionsCompanion.insert(
-            name: '工作',
-            isSystem: const Value(true),
-            createdAt: now,
-          ),
-          CollectionsCompanion.insert(
-            name: '日语',
-            isSystem: const Value(true),
-            createdAt: now,
-          ),
-          CollectionsCompanion.insert(
-            name: '灵感',
-            isSystem: const Value(true),
-            createdAt: now,
-          ),
-          CollectionsCompanion.insert(
-            name: '未分类',
-            isSystem: const Value(true),
-            createdAt: now,
-          ),
-        ],
+    await ensureDefaultCollections();
+  }
+
+  /// 确保默认分类（工作/学习/未分类）存在且为系统分类（不可删除）。
+  /// 幂等：旧库/新库均可安全调用（启动 bootstrap 也会执行）。
+  Future<void> ensureDefaultCollections() async {
+    const defaults = ['工作', '学习', '未分类'];
+    final existing = await (select(collections)
+          ..where((t) => t.isSystem.equals(true)))
+        .get();
+    final names = existing.map((c) => c.name).toSet();
+
+    for (final name in defaults) {
+      if (names.contains(name)) continue;
+      await into(collections).insert(
+        CollectionsCompanion.insert(
+          name: name,
+          isSystem: const Value(true),
+          createdAt: DateTime.now(),
+        ),
       );
-    });
+    }
   }
 }

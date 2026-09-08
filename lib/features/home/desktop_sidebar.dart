@@ -25,10 +25,6 @@ class DesktopSidebar extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final collections = ref.watch(collectionsProvider);
     final overview = ref.watch(reviewOverviewProvider);
-    final inboxCount = ref.watch(inboxItemsProvider).maybeWhen(
-          data: (list) => list.length,
-          orElse: () => 0,
-        );
     final due = overview.maybeWhen(data: (o) => o.due, orElse: () => 0);
 
     return Material(
@@ -73,27 +69,20 @@ class DesktopSidebar extends ConsumerWidget {
                     icon: Icons.school,
                     label: '今日复习',
                     badge: due,
-                    selected: activeTab == 1,
-                    onTap: () => onSelectTab(1),
-                  ),
-                  _SidebarRow(
-                    icon: Icons.inbox,
-                    label: '收件箱',
-                    badge: inboxCount,
                     selected: activeTab == 0,
                     onTap: () => onSelectTab(0),
                   ),
                   _SidebarRow(
                     icon: Icons.collections_bookmark,
                     label: '记忆库',
-                    selected: activeTab == 2 && _isAllView(ref),
+                    selected: activeTab == 1 && _isAllView(ref),
                     onTap: () => _openLibraryAll(ref),
                   ),
                   _SidebarRow(
                     icon: Icons.translate,
                     label: '学习',
-                    selected: activeTab == 3,
-                    onTap: () => onSelectTab(3),
+                    selected: activeTab == 2,
+                    onTap: () => onSelectTab(2),
                   ),
                 ],
               ),
@@ -146,7 +135,7 @@ class DesktopSidebar extends ConsumerWidget {
                             child: _SidebarRow(
                               icon: Icons.folder,
                               label: c.name,
-                              selected: activeTab == 2 &&
+                              selected: activeTab == 1 &&
                                   ref
                                           .watch(libraryFilterProvider)
                                           .collectionId ==
@@ -194,6 +183,8 @@ class DesktopSidebar extends ConsumerWidget {
       final repo = ref.read(itemRepositoryProvider);
       await repo.createCollection(name);
       ref.invalidate(collectionsProvider);
+      // 分类即时同步到云端（浏览器端弹窗下拉实时可见）
+      ref.read(syncServiceProvider).syncNow().ignore();
     }
   }
 
@@ -202,6 +193,13 @@ class DesktopSidebar extends ConsumerWidget {
     WidgetRef ref,
     CollectionRow c,
   ) async {
+    // 系统分类（工作/学习/未分类）不可删除
+    if (c.isSystem) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('「${c.name}」是默认分类，不能删除')),
+      );
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -223,6 +221,8 @@ class DesktopSidebar extends ConsumerWidget {
       await ref.read(itemRepositoryProvider).deleteCollection(c.id);
       ref.invalidate(collectionsProvider);
       ref.invalidate(collectionStatsProvider);
+      // 分类即时同步到云端
+      ref.read(syncServiceProvider).syncNow().ignore();
     }
   }
 
@@ -232,13 +232,13 @@ class DesktopSidebar extends ConsumerWidget {
   void _openLibraryAll(WidgetRef ref) {
     ref.read(libraryFilterProvider.notifier).state =
         ref.read(libraryFilterProvider).withCollection(null);
-    onSelectTab(2);
+    onSelectTab(1);
   }
 
   void _openCollection(WidgetRef ref, CollectionRow c) {
     ref.read(libraryFilterProvider.notifier).state =
         ref.read(libraryFilterProvider).withCollection(c.id);
-    onSelectTab(2);
+    onSelectTab(1);
   }
 
   void _openAddSheet(BuildContext context) {
