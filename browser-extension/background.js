@@ -2,90 +2,112 @@
  * Service Worker：
  * - 右键「收藏到拾忆」→ 子菜单：选分类后收藏… / 各分类直达
  * - 菜单中的分类列表来自云端快照（桌面新增/删除分类后自动可见）
- * - 菜单树是持久化缓存：基础项仅建一次；分类项做差异更新
- *   （onShown 在菜单即将显示时后台同步云端，绝不动正在显示的菜单）
+ * - 菜单树是浏览器持久化缓存：基础项幂等创建（已存在则跳过）；
+ *   分类项做差异更新（onShown 时后台同步云端，绝不动正在显示的菜单）
  * - 写入 WebDAV 后 ping 桌面端 → 即时同步
  */
 importScripts('snapshot.js');
 
-// SW 每次被唤醒（点图标/消息/启动）都重建右键菜单：
-// 解压扩展的「刷新」不会触发 onInstalled，只有运行期执行 create 才生效。
-// 冷启动/无菜单显示中，removeAll 安全；运行期一律走差异更新（syncMenuCategories）。
-rebuildMenus();
-
 // 当前已注册的分类直达项：id -> name（差异更新依据）。
+// SW 每次唤醒脚本重跑，此表会清空；以 getAll() 实际状态为基准重建。
 let _menuCols = new Map();
 
-// ---- 菜单构建（仅冷启动/重装时全量；运行期用差异更新） ----
+// SW 每次被唤醒（点图标/消息/启动/划词右键）都确保基础菜单存在：
+// 解压扩展的「刷新」不触发 onInstalled，只有运行期执行 create 才生效。
+ensureBaseMenus().catch(() => {});
 
-async function rebuildMenus() {
-  let cols = await fetchCollections();
-  if (cols == null) return; // 未配置/拉取失败：保留现有菜单
-  chrome.contextMenus.removeAll(() => {
-    _menuCols.clear();
-    _createBaseMenus();
-    for (const c of cols) _createColMenu(c);
-  });
+/**
+ * 幂等创建基础菜单：Chrome 菜单树持久化，重复 create 会抛
+ * "Duplicate id"——捕获忽略即可（标准 MV3 初始化模式）。
+ */
+async function ensureBaseMenus() {
+  for (const item of [
+    { id: 'shiyi-root', title: '收藏到拾忆' },
+    { id: 'shiyi-with-cat', parentId: 'shiyi-root', title: '选分类后收藏…' },
+    { parentId: 'shiyi-root', type: 'separator' },
+  ]) {
+    try {
+      await chrome.contextMenus.create({ ...item, contexts: ['selection'] });
+    } catch (_) {
+      /* 已存在：跳过 */
+    }
+  }
 }
 
-function _createBaseMenus() {
-  chrome.contextMenus.create({
-    id: 'shiyi-root',
-    title: '收藏到拾忆',
-    contexts: ['selection'], // 仅划词（选中文本）时显示
-  });
-  chrome.contextMenus.create({
-    id: 'shiyi-with-cat',
-    parentId: 'shiyi-root',
-    title: '选分类后收藏…',
-    contexts: ['selection'],
-  });
-  chrome.contextMenus.create({
-    parentId: 'shiyi-root',
-    type: 'separator',
-    contexts: ['selection'],
-  });
+async function _createColMenu(c) {
+  try {
+    await chrome.contextMenus.create({
+      id: `col-${c.id}`,
+      parentId: 'shiyi-root',
+      title: `收藏到「${c.name}」`,
+      contexts: ['selection'],
+    });
+    _menuCols.set(c.id, c.name);
+  } catch (_) {
+    /* 已存在：由下方 update 处理改名 */
+  }
 }
 
-function _createColMenu(c) {
-  chrome.contextMenus.create({
-    id: `col-${c.id}`,
-    parentId: 'shiyi-root',
-    title: `收藏到「${c.name}」`,
-    contexts: ['selection'],
-  });
-  _menuCols.set(c.id, c.name);
-}
-
-/// 运行期分类差异更新（不 removeAll，不碰正在显示的菜单）：
+/// 运行期分类差异更新：以浏览器实际菜单状态为基准，绝不 removeAll。
 /// 云端有而本地没有 → 新增；改名 → update；云端已删 → remove。
+/// 拉取失败时静默保留现状。
 async function syncMenuCategories() {
+  // SW 唤醒后内存态丢失：先从浏览器实际菜单恢复已注册分类
+  await _refreshMenuColsMap();
   const cols = await fetchCollections();
   if (cols == null) return; // 拉取失败：保留现状
   const cloud = new Map(cols.map((c) => [c.id, c.name]));
 
-  for (const [id, name] of _menuCols) {
+  for (const [id] of _menuCols) {
     if (!cloud.has(id)) {
-      chrome.contextMenus.remove(`col-${id}`, () => _menuCols.delete(id));
+      try {
+        await chrome.contextMenus.remove(`col-${id}`);
+      } catch (_) {}
+      _menuCols.delete(id);
     }
   }
   for (const c of cols) {
     if (!_menuCols.has(c.id)) {
-      _createColMenu(c);
+      await _createColMenu(c);
     } else if (_menuCols.get(c.id) !== c.name) {
-      chrome.contextMenus.update(`col-${c.id}`, {
-        title: `收藏到「${c.name}」`,
-      });
-      _menuCols.set(c.id, c.name);
+      try {
+        await chrome.contextMenus.update(`col-${c.id}`, {
+          title: `收藏到「${c.name}」`,
+        });
+        _menuCols.set(c.id, c.name);
+      } catch (_) {}
     }
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => rebuildMenus());
-chrome.runtime.onStartup.addListener(() => rebuildMenus());
+/** 从浏览器实际菜单恢复已注册分类（getAll 兼容回调/Promise 两种形态）。 */
+function _refreshMenuColsMap() {
+  return new Promise((resolve) => {
+    const done = (items) => {
+      _menuCols.clear();
+      for (const it of items || []) {
+        if (it.id && it.id.startsWith('col-') && it.title) {
+          const id = parseInt(it.id.slice(4), 10);
+          if (!Number.isNaN(id)) {
+            _menuCols.set(id, it.title.replace(/^收藏到「|」$/g, ''));
+          }
+        }
+      }
+      resolve();
+    };
+    try {
+      chrome.contextMenus.getAll(done);
+    } catch (_) {
+      done([]);
+    }
+  });
+}
+
+chrome.runtime.onInstalled.addListener(() => ensureBaseMenus().catch(() => {}));
+chrome.runtime.onStartup.addListener(() => ensureBaseMenus().catch(() => {}));
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.rebuildMenus) {
-    rebuildMenus().then(sendResponse);
+    syncMenuCategories().then(sendResponse);
     return true;
   }
 });
