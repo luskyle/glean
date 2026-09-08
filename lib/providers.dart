@@ -10,6 +10,8 @@ import 'data/dictionary/dictionary_service.dart';
 import 'data/repositories/item_repository.dart';
 import 'data/repositories/review_repository.dart';
 import 'data/settings/settings_store.dart';
+import 'data/sync/cloud_drive.dart';
+import 'data/sync/sync_service.dart';
 import 'domain/srs/sm2.dart';
 import 'domain/tagging/language.dart';
 
@@ -31,6 +33,25 @@ final analyticsProvider = Provider<AnalyticsService>((ref) {
 final settingsProvider = Provider<SettingsStore>((ref) {
   throw UnimplementedError('settingsProvider must be overridden in tests or '
       'initialized in main() via settingsStoreProvider');
+});
+
+/// 云盘同步服务（通道按设置路由：iCloud Drive 优先；WebDAV 兜底）。
+final syncServiceProvider = Provider<SyncService>((ref) {
+  final db = ref.watch(databaseProvider);
+  final settings = ref.watch(settingsProvider);
+  if (settings.syncChannel == 'webdav' &&
+      settings.webdavUrl != null &&
+      settings.webdavUrl!.trim().isNotEmpty) {
+    return SyncService(
+      db: db,
+      cloud: WebDavAdapter(
+        baseUrl: settings.webdavUrl!.trim(),
+        username: settings.webdavUser ?? '',
+        password: settings.webdavPassword ?? '',
+      ),
+    );
+  }
+  return SyncService(db: db, cloud: const ICloudDriveAdapter());
 });
 
 /// 由 main() 注入的 SharedPreferences 实例。

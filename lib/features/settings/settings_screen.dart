@@ -5,6 +5,7 @@ import '../../data/analytics/analytics_service.dart';
 import '../../data/export/export_service.dart';
 import '../../data/settings/settings_store.dart';
 import '../../providers.dart';
+import 'cloud_backup_section.dart';
 import 'paywall_sheet.dart';
 
 /// 设置：订阅 / 偏好 / 数据所有权 / 关于。
@@ -61,6 +62,9 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          // ---- 云盘备份（B 档）----
+          const CloudBackupSection(),
           const SizedBox(height: 12),
           // ---- 偏好 ----
           Card(

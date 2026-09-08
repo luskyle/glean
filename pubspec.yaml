@@ -25,6 +25,8 @@ dependencies:
   intl: ^0.20.2
   # 导出 zip（media + JSON）
   archive: ^4.0.0
+  # 云盘同步（B 档）：WebDAV 通道（iCloud 走原生通道）
+  webdav_client: ^1.1.0
 
 dev_dependencies:
   flutter_test:

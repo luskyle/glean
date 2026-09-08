@@ -26,6 +26,34 @@ class SettingsStore {
       _prefs.getString('settings.last_clipboard_fp');
   Future<void> setLastClipboardFingerprint(String fp) =>
       _prefs.setString('settings.last_clipboard_fp', fp);
+
+  // ---- 云盘同步（B 档）----
+
+  /// 同步通道：none | icloud | webdav。
+  String get syncChannel => _prefs.getString('settings.sync_channel') ?? 'none';
+  Future<void> setSyncChannel(String v) =>
+      _prefs.setString('settings.sync_channel', v);
+
+  String? get webdavUrl => _prefs.getString('settings.webdav_url');
+  Future<void> setWebdavUrl(String v) =>
+      _prefs.setString('settings.webdav_url', v);
+
+  String? get webdavUser => _prefs.getString('settings.webdav_user');
+  Future<void> setWebdavUser(String v) =>
+      _prefs.setString('settings.webdav_user', v);
+
+  String? get webdavPassword => _prefs.getString('settings.webdav_password');
+  Future<void> setWebdavPassword(String v) =>
+      _prefs.setString('settings.webdav_password', v);
+
+  /// 最近一次备份时间（本地展示用）。
+  DateTime? get lastBackupAt {
+    final raw = _prefs.getString('settings.last_backup_at');
+    return raw == null ? null : DateTime.tryParse(raw);
+  }
+
+  Future<void> markBackupNow() => _prefs.setString(
+      'settings.last_backup_at', DateTime.now().toIso8601String());
 }
 
 /// 免费额度（非 Pro）。
