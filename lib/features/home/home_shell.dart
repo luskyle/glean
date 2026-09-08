@@ -287,13 +287,12 @@ class _HomeShellState extends ConsumerState<HomeShell>
               onPressed: () => _openCurve(),
             ),
           // 收藏入口统一在侧栏右上角 ⊕；此处不放（避免重复）
-          // 设置唯一入口：记忆库页顶栏
-          if (tabIndex == 2)
-            IconButton(
-              tooltip: '设置',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => _openSettings(),
-            ),
+          // 设置常驻顶栏：任何页面都可直接进入
+          IconButton(
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => _openSettings(),
+          ),
         ],
       ),
     );
@@ -308,18 +307,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
       appBar: AppBar(
         title: Text(_titles[tabIndex]),
         actions: [
-          if (tabIndex == 1)
-            IconButton(
-              tooltip: '遗忘曲线',
-              icon: const Icon(Icons.show_chart),
-              onPressed: () => _openCurve(),
-            ),
-          if (tabIndex == 2)
-            IconButton(
-              tooltip: '设置',
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () => _openSettings(),
-            ),
           if (tabIndex == 0)
             IconButton(
               tooltip: '搜索（记忆库）',
@@ -327,6 +314,18 @@ class _HomeShellState extends ConsumerState<HomeShell>
               onPressed: () =>
                   ref.read(homeTabIndexProvider.notifier).state = 2,
             ),
+          if (tabIndex == 1)
+            IconButton(
+              tooltip: '遗忘曲线',
+              icon: const Icon(Icons.show_chart),
+              onPressed: () => _openCurve(),
+            ),
+          // 设置常驻顶栏：任何页面都可直接进入
+          IconButton(
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => _openSettings(),
+          ),
         ],
       ),
       body: IndexedStack(
