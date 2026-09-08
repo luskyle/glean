@@ -1,50 +1,85 @@
 /**
  * Service Worker：
- * - 「收藏到拾忆」：右键划词 → 立即可入库（默认未分类，明天复习）
- * - 「收藏到拾忆（选分类…）」：打开弹窗选分类后再写
- * 需要先在弹窗「设置」里配置 WebDAV（如坚果云 dav.jianguoyun.com/dav/）。
+ * - 右键「收藏到拾忆」→ 子菜单：快速收藏（未分类）/ 选分类… / 各分类直达
+ * - 菜单中的分类列表来自云端快照（桌面新增分类后自动可见）
+ *   （menu 在 SW 启动时与弹窗刷新时重建）
+ * - 写入 WebDAV 后 ping 桌面端 → 即时同步
  */
 importScripts('snapshot.js');
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'shiyi-save-selection',
-    title: '收藏到拾忆',
-    contexts: ['selection'],
-  });
-  chrome.contextMenus.create({
-    id: 'shiyi-save-with-cat',
-    title: '收藏到拾忆（选分类…）',
-    contexts: ['selection'],
-  });
+chrome.runtime.onInstalled.addListener(() => rebuildMenus());
+chrome.runtime.onStartup.addListener(() => rebuildMenus());
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg && msg.rebuildMenus) {
+    rebuildMenus().then(sendResponse);
+    return true;
+  }
 });
 
+async function rebuildMenus() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: 'shiyi-root', title: '收藏到拾忆' });
+    chrome.contextMenus.create({
+      id: 'shiyi-save',
+      parentId: 'shiyi-root',
+      title: '快速收藏（未分类）',
+    });
+    chrome.contextMenus.create({
+      id: 'shiyi-with-cat',
+      parentId: 'shiyi-root',
+      title: '选分类后收藏…',
+    });
+    chrome.contextMenus.create({
+      parentId: 'shiyi-root',
+      type: 'separator',
+    });
+    // 云端分类直达（异步拉取后追加；失败则只有上面三项）
+    (async () => {
+      const cols = await fetchCollections();
+      for (const c of cols) {
+        chrome.contextMenus.create({
+          id: `col-${c.id}`,
+          parentId: 'shiyi-root',
+          title: `收藏到「${c.name}」`,
+        });
+      }
+    })();
+  });
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId === 'shiyi-save-with-cat') {
-    // 缓存选区 → 打开弹窗让用户选分类
+  const text = (info.selectionText || '').trim();
+  if (!text) return;
+
+  if (info.menuItemId === 'shiyi-save') {
+    const ok = await saveWith(text, tab?.url, null);
+    notify(ok ? '已收藏（未分类）· 明天开始复习' : '收藏失败：请先在弹窗配置 WebDAV');
+    return;
+  }
+  if (info.menuItemId === 'shiyi-with-cat') {
     await chrome.storage.local.set({
-      pendingText: (info.selectionText || '').trim(),
+      pendingText: text,
       pendingUrl: tab?.url || '',
     });
     chrome.action.openPopup();
     return;
   }
-  if (info.menuItemId !== 'shiyi-save-selection') return;
-  const text = (info.selectionText || '').trim();
-  if (!text) return;
-
-  const ok = await saveSelection(text, tab?.url);
-  notify(ok ? '已收藏到拾忆 · 明天开始复习' : '收藏失败：请先在弹窗里配置 WebDAV');
+  if (typeof info.menuItemId === 'string' && info.menuItemId.startsWith('col-')) {
+    const collectionId = parseInt(info.menuItemId.slice(4), 10) || null;
+    const ok = await saveWith(text, tab?.url, collectionId);
+    notify(ok ? '已收藏到所选分类' : '收藏失败：请先在弹窗配置 WebDAV');
+  }
 });
 
-async function saveSelection(text, url) {
+/** 收藏（带可选分类），写入云端成功后通知桌面端实时同步。 */
+async function saveWith(text, url, collectionId) {
   try {
     const cfg = await loadConfig();
     if (!cfg.url) return false;
     const snap = (await davGet(cfg)) || emptySnapshot();
     if (!snap.rows) snap.rows = {};
-    appendInbox(snap, text, { url });
-    await davPut(cfg, snap);
+    appendCard(snap, text, '', { url, collectionId });
+    await davPut(cfg, snap); // davPut 内部会 pingDesktop
     return true;
   } catch (e) {
     console.error('shiyi save failed', e);

@@ -47,10 +47,11 @@ function pingDesktop() {
   } catch (_) {}
 }
 
-/** 生成不冲突的 id（负数，避开 App 的正值自增 id）。 */
-let _negativeId = -1;
+/** 生成不冲突的 id：负整数（避开 App 正值自增）；时间戳基 + 自增保证跨会话唯一。 */
+let _seq = 0;
 function nextId() {
-  return _negativeId--;
+  _seq += 1;
+  return -(Date.now() * 1000 + _seq);
 }
 
 function iso(offsetDays = 0) {

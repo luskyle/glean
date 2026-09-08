@@ -20,6 +20,8 @@ async function refreshCollections() {
     o.textContent = c.name;
     sel.appendChild(o);
   }
+  // 同步重建右键分类子菜单（桌面新增/删除分类后立即可见）
+  chrome.runtime.sendMessage({ rebuildMenus: true }).catch(() => {});
 }
 
 async function loadSettings() {
