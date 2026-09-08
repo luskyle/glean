@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>拾忆 Shiyi —— 收藏驱动的记忆工具</title>
-<meta name="description" content="把你想记住的任何东西收进来：单词、摘抄、灵感、考纲。拾忆用间隔重复（SM-2）自动安排复习，用真实数据证明你的记忆在变好。">
+<meta name="description" content="把你想记住的任何东西收进来：单词、摘抄、灵感、考纲。浏览器划词收藏直达你的分类，拾忆用间隔重复（SM-2）自动安排复习，用真实数据证明你的记忆在变好。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 <style>
   :root {
@@ -119,6 +119,7 @@
   .sec-head p { margin-top: 12px; color: var(--ink-2); }
 
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .grid2x2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
   .card {
     background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 28px 26px;
@@ -168,7 +169,7 @@
   .tag.later { background: #F1F3F7; color: var(--ink-2); }
 
   /* 下载 */
-  .dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
   .dl .card { text-align: center; }
   .dl .card .ico { margin: 0 auto 14px; }
   .dl .card a.btn { margin-top: 6px; }
@@ -182,7 +183,7 @@
 
   @media (max-width: 860px) {
     header h1 { font-size: 36px; }
-    .grid3, .dl { grid-template-columns: 1fr; }
+    .grid3, .grid2x2, .dl { grid-template-columns: 1fr; }
     .flow { grid-template-columns: repeat(3, 1fr); }
     .flow .arrow { display: none; }
     .privacy { grid-template-columns: 1fr; padding: 32px 24px; }
@@ -213,12 +214,12 @@
   <div class="wrap">
     <span class="kicker">🗂️ 收藏 · 记忆 · 证明</span>
     <h1>把想记住的任何东西<br>收进来，<em>它替你还</em></h1>
-    <p class="sub">单词、摘抄、灵感、考纲——从任何 App 划进来，拾忆用间隔重复（SM-2）自动安排复习，直到你真正记住。</p>
+    <p class="sub">单词、摘抄、灵感、考纲——浏览器划词或从任何 App 划进来，直接进你的分类。拾忆用间隔重复（SM-2）自动安排复习，直到你真正记住。</p>
     <div class="hero-cta">
       <a class="btn" href="#download">下载 App</a>
       <a class="btn ghost" href="https://github.com/luskyle/shiyi/releases" target="_blank" rel="noopener">查看 Release</a>
     </div>
-    <div class="hero-meta">免费开源 · 本地优先 · 数据永久属于你</div>
+    <div class="hero-meta">免费开源 · 本地优先 · 多端同步 · 数据永久属于你</div>
 
     <div class="mock fade">
       <div class="mock-bar">
@@ -227,13 +228,14 @@
       <div class="mock-body">
         <div class="mock-side">
           <span class="active">今日复习 · 3</span>
-          <span>收件箱 · 1</span>
-          <span>记忆库</span>
-          <span>分组 · 日语</span>
-          <span>分组 · 工作</span>
+          <span>学习 · 日语</span>
+          <span>分组</span>
+          <span>工作</span>
+          <span>学习</span>
+          <span>未分类</span>
         </div>
         <div class="mock-main">
-          <div class="mock-search">🔍 搜索记忆库…</div>
+          <div class="mock-search">🔍 搜索收藏…</div>
           <div class="mock-card">
             <span class="badge">日</span>
             <div><b>食べる</b><br><small>たべる · 吃</small></div>
@@ -258,19 +260,19 @@
 <section id="feature">
   <div class="wrap">
     <div class="sec-head fade">
-      <h2>三大支柱：进得来 · 记得住 · 看得见</h2>
-      <p>拾忆不是一个剪藏夹——收藏只是开始，复习负责记住，曲线负责证明。</p>
+      <h2>四个支柱：收进来 · 记得住 · 学得会 · 看得见</h2>
+      <p>拾忆不是一个剪藏夹——收藏只是开始，学习拉近记忆，复习负责记住，曲线负责证明。</p>
     </div>
-    <div class="grid3">
+    <div class="grid2x2">
       <div class="card fade">
-        <div class="ico">📥</div>
-        <h3>收藏管道</h3>
-        <p>零等待入库：从任何位置把内容划进收件箱，App 自动成卡并安排首次复习。</p>
+        <div class="ico">🖱️</div>
+        <h3>浏览器划词收藏</h3>
+        <p>网页选中即收藏：右键直达分组，写入你自己的 WebDAV 云盘，桌面秒级出现。</p>
         <ul>
-          <li>手录收藏：词条 / 语录 / 灵感</li>
-          <li>剪贴板监听：复制即提示</li>
-          <li>自动补释义、读音（离线词库优先）</li>
-          <li>标签与分组：一条内容一个决定</li>
+          <li>右键菜单：选分类后收藏 / 分组直达</li>
+          <li>收藏内容直接进对应分组</li>
+          <li>桌面 / 浏览器分类双向实时同步</li>
+          <li>完全离线优先，服务器零存储</li>
         </ul>
       </div>
       <div class="card fade">
@@ -282,6 +284,17 @@
           <li>忘了 / 模糊 / 记得 → 自动调整间隔</li>
           <li>断点续复习，随时退出不丢进度</li>
           <li>review_log 全量留痕，可切 FSRS</li>
+        </ul>
+      </div>
+      <div class="card fade">
+        <div class="ico">🌏</div>
+        <h3>主动学习 · 多语言</h3>
+        <p>专门的「学习」Tab：多语言词库，关卡递进解锁，生词一键进复习队列。</p>
+        <ul>
+          <li>日语 / 英语免费，韩语 / 法语 / 西语 PRO</li>
+          <li>从基础开始循序渐进，解锁更难卡片</li>
+          <li>读音 / 释义 / TTS 朗读全自动</li>
+          <li>学完自动排入复习，闭环到 SM-2</li>
         </ul>
       </div>
       <div class="card fade">
@@ -306,11 +319,11 @@
       <p>收藏即承诺——我收藏的东西，会被拾忆替我记住。</p>
     </div>
     <div class="flow fade">
-      <div class="step"><div class="n">1</div><b>收藏</b><small>手录 / 剪贴板</small></div>
+      <div class="step"><div class="n">1</div><b>划词收藏</b><small>浏览器 / 手录 / 剪贴板</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">2</div><b>成卡</b><small>自动补释义 · 可编辑</small></div>
+      <div class="step"><div class="n">2</div><b>进分组</b><small>直接进对应分类</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">3</div><b>排期</b><small>明天首次复习</small></div>
+      <div class="step"><div class="n">3</div><b>云盘同步</b><small>WebDAV / iCloud，桌面秒级</small></div>
       <div class="arrow">→</div>
       <div class="step"><div class="n">4</div><b>复习</b><small>三键评级 · SM-2</small></div>
       <div class="arrow">→</div>
@@ -325,13 +338,13 @@
       <div>
         <h2>数据默认属于你</h2>
         <p>拾忆把「拿不回数据」的担心当作首要设计约束：本地优先，隐私默认。</p>
-        <p>服务器永不存储你的任何媒体文件——这是架构上的铁律，不是口头承诺。</p>
+        <p>同步走进你自己的云盘（WebDAV / iCloud Drive），服务器永不存储你的任何数据与媒体文件——这是架构上的铁律，不是口头承诺。</p>
       </div>
       <div class="list">
         <div>📦 收藏与复习数据默认仅保存在本机</div>
         <div>📤 一键导出 JSON，随时插拔</div>
-        <div>🧹 可编辑、可删除、删了就是删了</div>
-        <div>🔐 剪藏只存引用与摘要，不托管原文</div>
+        <div>🔄 云盘同步：数据只进你的 WebDAV / iCloud</div>
+        <div>🧹 可编辑、可删除、删了就是删了（删除跨端同步）</div>
       </div>
     </div>
   </div>
@@ -346,12 +359,14 @@
     <div class="fade" style="overflow-x:auto;">
       <table>
         <tr><th>能力</th><th>状态</th><th>说明</th></tr>
-        <tr><td>三 Tab 收藏 / 复习 / 记忆库</td><td><span class="tag now">已上线</span></td><td>Cubox 式响应式布局：桌面侧栏 + 移动三 Tab</td></tr>
+        <tr><td>分组即内容区（取消收件箱 / 记忆库聚合）</td><td><span class="tag now">已上线</span></td><td>收藏直接进工作 / 学习 / 未分类等分组，侧栏直达分组内容</td></tr>
+        <tr><td>浏览器划词收藏扩展</td><td><span class="tag now">已上线</span></td><td>右键直达分组，写入自有 WebDAV，桌面秒级出现</td></tr>
+        <tr><td>云盘同步（WebDAV / iCloud）</td><td><span class="tag now">已上线</span></td><td>多端合并、删除跨端同步；服务器 0 存储</td></tr>
         <tr><td>SM-2 间隔重复 + 遗忘曲线</td><td><span class="tag now">已上线</span></td><td>三键评级、周视图正确率曲线</td></tr>
-        <tr><td>收藏管道（手录 / 剪贴板）</td><td><span class="tag now">已上线</span></td><td>离线词库自动补释义读音</td></tr>
+        <tr><td>主动学习 · 多语言关卡</td><td><span class="tag now">已上线</span></td><td>日语 / 英语免费；韩语 / 法语 / 西语 PRO；TTS 朗读</td></tr>
+        <tr><td>主题切换（跟随系统 / 浅色 / 深色）</td><td><span class="tag now">已上线</span></td><td>iOS HIG 风格，全端一致</td></tr>
         <tr><td>OCR 拍照收藏 / 系统分享面板</td><td><span class="tag next">V1.1</span></td><td>拍照进管道，图片存为卡面</td></tr>
         <tr><td>Anki 导入导出</td><td><span class="tag next">V1.1</span></td><td>标准牌组互通，数据零锁定</td></tr>
-        <tr><td>云盘同步（iCloud / WebDAV）</td><td><span class="tag next">V1.2</span></td><td>备份进用户自己的云盘，服务器 0 存储</td></tr>
         <tr><td>FSRS 调度升级</td><td><span class="tag later">V2</span></td><td>数据积累后自动切换，间隔预测更精准</td></tr>
         <tr><td>Windows / macOS 桌面端</td><td><span class="tag later">V2</span></td><td>全键盘复习，多端同一代码库</td></tr>
       </table>
@@ -366,6 +381,12 @@
       <p>产物随每个 GitHub Release 自动构建发布。</p>
     </div>
     <div class="dl">
+      <div class="card fade">
+        <div class="ico">🧩</div>
+        <h3>浏览器扩展</h3>
+        <p>Chrome / Edge（Manifest V3）：划词即收藏。</p>
+        <a class="btn" href="https://github.com/luskyle/shiyi/tree/main/browser-extension" target="_blank" rel="noopener">安装扩展</a>
+      </div>
       <div class="card fade">
         <div class="ico">🤖</div>
         <h3>Android</h3>
