@@ -51,10 +51,12 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
     await s.setWebdavUser(_userCtrl.text.trim());
     await s.setWebdavPassword(_passCtrl.text);
     ref.invalidate(syncServiceProvider);
+    // 配置即生效：保存后自动安全同步一次（拉取合并 → 推送）
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('WebDAV 已保存')));
+          .showSnackBar(const SnackBar(content: Text('WebDAV 已保存，正在同步…')));
     }
+    await _run('sync');
   }
 
   Future<void> _run(String action) async {
@@ -62,22 +64,29 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final svc = ref.read(syncServiceProvider);
-      final String? err =
-          action == 'backup' ? await svc.backup() : await svc.restore();
+      final String? err = switch (action) {
+        'sync' => await svc.syncNow(), // 安全同步：拉取合并 → 推送全量
+        'restore' => await svc.restore(), // 强制从云端合并
+        _ => await svc.backup(),
+      };
       if (err != null) {
         messenger.showSnackBar(SnackBar(content: Text(err)));
       } else {
-        if (action == 'backup') {
+        if (action != 'restore') {
           await ref.read(settingsProvider).markBackupNow();
-        } else {
-          ref.invalidate(inboxItemsProvider);
-          ref.invalidate(libraryItemsProvider);
-          ref.invalidate(reviewOverviewProvider);
-          ref.invalidate(quotaProvider);
-          ref.invalidate(collectionsProvider);
         }
-        messenger.showSnackBar(
-            SnackBar(content: Text(action == 'backup' ? '备份完成' : '已从云端恢复')));
+        // 同步/恢复都刷新页面数据（拉取的内容立刻可见）
+        ref.invalidate(inboxItemsProvider);
+        ref.invalidate(libraryItemsProvider);
+        ref.invalidate(reviewOverviewProvider);
+        ref.invalidate(quotaProvider);
+        ref.invalidate(collectionsProvider);
+        final msg = switch (action) {
+          'sync' => '同步完成',
+          'restore' => '已从云端恢复',
+          _ => '备份完成',
+        };
+        messenger.showSnackBar(SnackBar(content: Text(msg)));
       }
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('操作失败：$e')));
@@ -176,9 +185,9 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _busy ? null : () => _run('backup'),
-                    icon: const Icon(Icons.upload, size: 18),
-                    label: const Text('立即备份'),
+                    onPressed: _busy ? null : () => _run('sync'),
+                    icon: const Icon(Icons.sync, size: 18),
+                    label: const Text('立即同步'),
                   ),
                 ),
                 const SizedBox(width: 10),
