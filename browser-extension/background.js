@@ -44,10 +44,12 @@ async function rebuildMenus() {
       type: 'separator',
       contexts: ['selection'],
     });
-    // 云端分类直达（异步拉取后追加；失败则只有上面三项）
+    // 云端分类直达（异步拉取后追加；失败则只有上面三项）。
+    // 「未分类」已有「快速收藏（未分类）」入口，跳过避免重复。
     (async () => {
       const cols = await fetchCollections();
       for (const c of cols) {
+        if (c.name === '未分类') continue;
         chrome.contextMenus.create({
           id: `col-${c.id}`,
           parentId: 'shiyi-root',

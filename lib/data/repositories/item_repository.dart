@@ -5,6 +5,9 @@ import '../dictionary/dictionary_service.dart';
 import '../../domain/srs/sm2.dart';
 import '../../domain/tagging/language.dart';
 
+/// 默认「未分类」分组名（列表排序时恒置底）。
+const kUncategorizedName = '未分类';
+
 /// 收藏条目 + 关联卡片（join 视图）。
 class ItemWithCard {
   const ItemWithCard({required this.item, this.card});
@@ -454,7 +457,14 @@ class ItemRepository {
 
   // ---- 分组（库）----
 
-  Future<List<CollectionRow>> collections() => db.select(db.collections).get();
+  /// 分类列表（「未分类」恒置底，其余按 id 即创建顺序）。
+  Future<List<CollectionRow>> collections() async {
+    final all = await db.select(db.collections).get();
+    final uncategorized =
+        all.where((c) => c.name == kUncategorizedName).toList();
+    final rest = all.where((c) => c.name != kUncategorizedName).toList();
+    return [...rest, ...uncategorized];
+  }
 
   Future<int> createCollection(String name, {bool isSystem = false}) {
     return db.into(db.collections).insert(

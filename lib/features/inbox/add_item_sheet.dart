@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/analytics/analytics_service.dart';
+import '../../data/repositories/item_repository.dart';
 import '../../data/settings/settings_store.dart';
 import '../../domain/tagging/language.dart';
 import '../../providers.dart';
@@ -167,7 +168,7 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
                       value: null,
                       child: Text('未分类'),
                     ),
-                    ...cols.where((c) => c.isSystem || c.id != -1).map(
+                    ...cols.where((c) => c.name != kUncategorizedName).map(
                           (c) => DropdownMenuItem<int?>(
                             value: c.id,
                             child: Text(c.name),

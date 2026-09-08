@@ -10,16 +10,21 @@ async function refreshCollections() {
   lastCollections = await fetchCollections();
   const sel = $('collection');
   sel.innerHTML = '';
-  const opt = document.createElement('option');
-  opt.value = '';
-  opt.textContent = '未分类';
-  sel.appendChild(opt);
-  for (const c of lastCollections) {
+  // 「未分类」由下面硬编码兜底，云端同名分类跳过（避免重复选项）
+  const shown = (lastCollections || []).filter(
+    (c) => c.name !== '未分类' && c.id != null,
+  );
+  for (const c of shown) {
     const o = document.createElement('option');
     o.value = c.id;
     o.textContent = c.name;
     sel.appendChild(o);
   }
+  const opt = document.createElement('option');
+  opt.value = '';
+  opt.textContent = '未分类';
+  opt.selected = true; // 默认选中未分类，且放在列表最后
+  sel.appendChild(opt);
   // 同步重建右键分类子菜单（桌面新增/删除分类后立即可见）
   chrome.runtime.sendMessage({ rebuildMenus: true }).catch(() => {});
 }

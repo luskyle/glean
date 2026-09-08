@@ -95,6 +95,19 @@ void main() {
     expect(again.length, cols.length);
   });
 
+  test('分类列表排序：「未分类」恒置底', () async {
+    // 默认分类（工作/学习/未分类）+ 一个新分类
+    final newId = await repo.createCollection('英语');
+    final ordered = await repo.collections();
+    final names = ordered.map((c) => c.name).toList();
+
+    expect(names.last, '未分类', reason: '未分类应恒在列表最后');
+    expect(names.indexOf('英语'), lessThan(names.indexOf('未分类')));
+
+    // 新分类 id 存在，顺序稳定（其余按创建顺序）
+    expect(ordered.map((c) => c.id), contains(newId));
+  });
+
   test('词库导入支持多语言；unstudiedWords 返回未学词', () async {
     // 模拟导入韩语示例包
     await repo.importDictionaryEntries(const [
