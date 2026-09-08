@@ -13,22 +13,52 @@ const kVideoExts = {'.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v'};
 
 /// 本地素材库仓储（记忆教练：链接不导入）：
 /// 只写素材索引（路径/类型），绝不复制媒体文件；素材仅本地使用。
+///
+/// 目录级管理：链接目录（带用途）→ 递归扫描入索引；可整目录取消链接。
+/// 素材级管理：多选批注用途 / 取消单个素材链接。
 class MediaRepository {
   MediaRepository(this.db);
 
   final AppDatabase db;
 
-  /// 全部素材（新在前）。
-  Future<List<MediaAssetRow>> all() async {
-    final q = db.select(db.mediaAssets)
-      ..orderBy([(t) => drift.OrderingTerm.desc(t.createdAt)]);
+  // ---- 目录 ----
+
+  /// 全部素材目录（新在前）。
+  Future<List<MediaFolderRow>> folders() async {
+    final q = db.select(db.mediaFolders)
+      ..orderBy([(t) => drift.OrderingTerm.desc(t.linkedAt)]);
     return q.get();
   }
 
-  /// 生成本地文件素材索引：扫描目录（递归）下图片/视频，幂等（按路径去重）。
-  Future<List<MediaAssetRow>> linkFolder(String dirPath) async {
-    final files = await _scanMediaFiles(dirPath);
+  /// 链接目录：登记目录（带用途）→ 递归扫描素材，幂等（按路径去重）。
+  Future<List<MediaAssetRow>> linkFolder(String dirPath,
+      {String? purpose}) async {
     final now = DateTime.now();
+    // 目录登记（已存在则更新用途）
+    final folderRow = await (db.select(db.mediaFolders)
+          ..where((t) => t.path.equals(dirPath)))
+        .getSingleOrNull();
+    final int folderId;
+    if (folderRow == null) {
+      folderId = await db.into(db.mediaFolders).insert(
+            MediaFoldersCompanion.insert(
+              path: dirPath,
+              name: p.basename(dirPath),
+              purpose: drift.Value(purpose),
+              linkedAt: now,
+            ),
+          );
+    } else {
+      folderId = folderRow.id;
+      await (db.update(db.mediaFolders)..where((t) => t.id.equals(folderId)))
+          .write(MediaFoldersCompanion(
+        purpose:
+            purpose == null ? const drift.Value.absent() : drift.Value(purpose),
+      ));
+    }
+
+    // 扫描目录素材并入索引（挂 folderId）
+    final files = await _scanMediaFiles(dirPath);
     final existing = await all();
     final knownPaths = existing.map((a) => a.path).toSet();
 
@@ -41,6 +71,7 @@ class MediaRepository {
         path: f.path,
         name: p.basename(f.path),
         sizeBytes: drift.Value(f.lengthSync()),
+        folderId: drift.Value(folderId),
         createdAt: now,
       ));
     }
@@ -48,6 +79,40 @@ class MediaRepository {
       await db.batch((b) => b.insertAll(db.mediaAssets, batch));
     }
     return all();
+  }
+
+  /// 取消链接目录：删除目录记录 + 该目录下全部素材索引（不删原文件）。
+  Future<void> unlinkFolder(int folderId) async {
+    await (db.delete(db.mediaAssets)..where((t) => t.folderId.equals(folderId)))
+        .go();
+    await (db.delete(db.mediaFolders)..where((t) => t.id.equals(folderId)))
+        .go();
+  }
+
+  /// 更新目录用途说明。
+  Future<void> updateFolderPurpose(int folderId, String? purpose) async {
+    await (db.update(db.mediaFolders)..where((t) => t.id.equals(folderId)))
+        .write(MediaFoldersCompanion(
+      purpose:
+          purpose == null ? const drift.Value.absent() : drift.Value(purpose),
+    ));
+  }
+
+  /// 指定目录下的素材（新在前）。
+  Future<List<MediaAssetRow>> assetsOfFolder(int folderId) async {
+    final q = db.select(db.mediaAssets)
+      ..where((t) => t.folderId.equals(folderId))
+      ..orderBy([(t) => drift.OrderingTerm.desc(t.createdAt)]);
+    return q.get();
+  }
+
+  // ---- 素材 ----
+
+  /// 全部素材（新在前）。
+  Future<List<MediaAssetRow>> all() async {
+    final q = db.select(db.mediaAssets)
+      ..orderBy([(t) => drift.OrderingTerm.desc(t.createdAt)]);
+    return q.get();
   }
 
   /// 新增单个素材（文件选择器指定文件时）。
@@ -71,9 +136,29 @@ class MediaRepository {
         .getSingle();
   }
 
-  /// 删除素材索引（只删记录，不删文件——链接不导入）。
-  Future<void> unlink(int id) async {
+  /// 批量补充素材用途说明。
+  Future<void> setAssetPurpose(List<int> assetIds, String? purpose) async {
+    for (final id in assetIds) {
+      await (db.update(db.mediaAssets)..where((t) => t.id.equals(id))).write(
+        MediaAssetsCompanion(
+          purpose: purpose == null
+              ? const drift.Value.absent()
+              : drift.Value(purpose),
+        ),
+      );
+    }
+  }
+
+  /// 取消链接单个素材（只删索引，不删文件）。
+  Future<void> unlinkAsset(int id) async {
     await (db.delete(db.mediaAssets)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// 批量取消链接素材。
+  Future<void> unlinkAssets(List<int> ids) async {
+    for (final id in ids) {
+      await unlinkAsset(id);
+    }
   }
 
   /// 递归扫描目录下的媒体文件。

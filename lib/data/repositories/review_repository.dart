@@ -28,13 +28,23 @@ class ReviewRepository {
   final AppDatabase db;
 
   /// 今日复习队列：所有到期卡（含积压），按到期时间升序，封顶 200。
-  Future<List<CardWithItem>> dueCards({DateTime? now, int limit = 200}) async {
+  /// [memorySetId] 非空时仅返回该记忆集内的条目（记忆管理复习）。
+  Future<List<CardWithItem>> dueCards(
+      {DateTime? now, int limit = 200, int? memorySetId}) async {
     final ts = now ?? DateTime.now();
     final q = db.select(db.cards).join([
       innerJoin(db.items, db.items.cardId.equalsExp(db.cards.id)),
+      if (memorySetId != null)
+        innerJoin(
+            db.memorySetItems, db.memorySetItems.itemId.equalsExp(db.items.id)),
     ])
-      ..where(db.items.cardId.isNotNull() &
-          db.cards.dueAt.isSmallerOrEqualValue(ts))
+      ..where([
+        if (memorySetId != null)
+          db.memorySetItems.memorySetId.equals(memorySetId)
+      ].fold(
+          db.items.cardId.isNotNull() &
+              db.cards.dueAt.isSmallerOrEqualValue(ts),
+          (a, e) => a & e))
       ..orderBy([OrderingTerm.asc(db.cards.dueAt)])
       ..limit(limit);
     final rows = await q.get();

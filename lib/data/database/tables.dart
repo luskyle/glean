@@ -158,4 +158,54 @@ class MediaAssets extends Table {
 
   IntColumn get sizeBytes => integer().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+
+  /// 所属素材目录（folder 来源；gallery 为 null）
+  IntColumn get folderId =>
+      integer().nullable().references(MediaFolders, #id)();
+
+  /// 素材用途说明（用户批注：这张图是干嘛用的）
+  TextColumn get purpose => text().nullable()();
+}
+
+/// 素材目录（链接不导入）：记录已链接的本地目录与用途说明。
+@DataClassName('MediaFolderRow')
+class MediaFolders extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 目录绝对路径（唯一）
+  TextColumn get path => text().unique()();
+
+  /// 目录名（展示用）
+  TextColumn get name => text()();
+
+  /// 目录用途说明（用户指定：这个目录里的素材是干嘛的）
+  TextColumn get purpose => text().nullable()();
+
+  DateTimeColumn get linkedAt => dateTime()();
+}
+
+/// 记忆集（记忆教练：用户自建的复习集合）：
+/// 一个记忆集 = 一组收藏条目（卡片），可对集合整体学习/复习/回顾。
+@DataClassName('MemorySetRow')
+class MemorySets extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get name => text()();
+
+  /// 集合用途/说明
+  TextColumn get purpose => text().nullable()();
+
+  DateTimeColumn get createdAt => dateTime()();
+}
+
+/// 记忆集条目（收藏条目 → 记忆集 多对多）。
+@DataClassName('MemorySetItemRow')
+class MemorySetItems extends Table {
+  IntColumn get memorySetId =>
+      integer().references(MemorySets, #id, onDelete: KeyAction.cascade)();
+  IntColumn get itemId =>
+      integer().references(Items, #id, onDelete: KeyAction.cascade)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {memorySetId, itemId};
 }

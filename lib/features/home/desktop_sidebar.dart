@@ -7,6 +7,7 @@ import '../../data/database/database.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
 import '../library/media_library_screen.dart';
+import '../memory/memory_manager_screen.dart';
 
 /// iOS 风格侧边栏（HIG Sidebar）：大标题 + 分组导航 + 底部设置。
 ///
@@ -84,6 +85,11 @@ class DesktopSidebar extends ConsumerWidget {
                     label: '素材库',
                     onTap: () => _openMediaLibrary(context),
                   ),
+                  _SidebarRow(
+                    icon: Icons.workspaces_outline,
+                    label: '记忆管理',
+                    onTap: () => _openMemoryManager(context),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -159,6 +165,12 @@ class DesktopSidebar extends ConsumerWidget {
   void _openMediaLibrary(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const MediaLibraryScreen()),
+    );
+  }
+
+  void _openMemoryManager(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MemoryManagerScreen()),
     );
   }
 

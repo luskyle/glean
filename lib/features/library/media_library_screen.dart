@@ -10,87 +10,524 @@ import '../../providers.dart';
 import '../../shared/empty_state.dart';
 
 /// 本地素材库（记忆教练：链接不导入）：
-/// 桌面端选择目录 → 递归扫描图片/视频 → 建索引；素材仅本地使用，
-/// 不参与云同步。素材可被收藏（卡片）引用。
-class MediaLibraryScreen extends ConsumerWidget {
+/// 桌面端链接目录（可填用途）→ 递归扫描图片/视频建索引；
+/// 目录分组视图 + 网格/列表切换；素材仅本地使用，不参与云同步。
+class MediaLibraryScreen extends ConsumerStatefulWidget {
   const MediaLibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final assets = ref.watch(mediaAssetsProvider);
+  ConsumerState<MediaLibraryScreen> createState() => _MediaLibraryScreenState();
+}
 
+class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
+  String _viewMode = 'grid';
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('素材库'),
         actions: [
+          // 视图切换：网格 / 列表
+          SegmentedButton<String>(
+            style: const ButtonStyle(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            segments: const [
+              ButtonSegment(
+                  value: 'grid',
+                  icon: Icon(Icons.grid_view_outlined, size: 16)),
+              ButtonSegment(
+                  value: 'list',
+                  icon: Icon(Icons.view_agenda_outlined, size: 16)),
+            ],
+            selected: {_viewMode},
+            onSelectionChanged: (s) => setState(() => _viewMode = s.first),
+          ),
           IconButton(
             tooltip: '链接本地目录',
             icon: const Icon(Icons.folder_open),
-            onPressed: () => _linkFolder(context, ref),
+            onPressed: _linkFolder,
           ),
         ],
       ),
-      body: assets.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败：$e')),
-        data: (list) {
-          if (list.isEmpty) {
-            return Center(
-              child: EmptyState(
-                icon: Icons.photo_library_outlined,
-                title: '素材库还空着',
-                subtitle: '链接本地目录后，图片/视频素材会出现在这里。',
-                action: FilledButton.icon(
-                  onPressed: () => _linkFolder(context, ref),
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('链接目录'),
-                ),
-              ),
-            );
-          }
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 220,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-            ),
-            itemCount: list.length,
-            itemBuilder: (_, i) => _AssetTile(asset: list[i]),
-          );
-        },
-      ),
+      body: _FoldersView(viewMode: _viewMode),
     );
   }
 
-  /// 桌面端：文件选择器选目录 → 递归扫描入索引。
-  Future<void> _linkFolder(BuildContext context, WidgetRef ref) async {
+  // ---- 目录链接（带用途） ----
+
+  Future<void> _linkFolder() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await FilePicker.platform.getDirectoryPath(
         dialogTitle: '选择素材目录（图片 / 视频）',
       );
-      if (dir == null || dir.isEmpty) return;
-      await ref.read(mediaRepositoryProvider).linkFolder(dir);
+      if (dir == null || dir.isEmpty || !mounted) return;
+      // 可输入用途说明
+      final purpose = await _promptPurpose(title: '目录用途（可选）');
+      if (!mounted) return;
+      await ref.read(mediaRepositoryProvider).linkFolder(dir, purpose: purpose);
       ref.invalidate(mediaAssetsProvider);
+      ref.invalidate(mediaFoldersProvider);
       messenger.showSnackBar(SnackBar(content: Text('已链接：$dir')));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('链接失败：$e')));
     }
   }
+
+  Future<String?> _promptPurpose(
+      {required String title, String? initial}) async {
+    final ctrl = TextEditingController(text: initial ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '如：备考截图 / 课程海报'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('跳过'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    return (result == null || result.isEmpty) ? null : result;
+  }
 }
 
-/// 素材网格项：图片缩略图 / 视频首帧。
-class _AssetTile extends ConsumerStatefulWidget {
-  const _AssetTile({required this.asset});
+/// 目录级视图：目录卡片列表 + 目录内素材网格/列表。
+class _FoldersView extends ConsumerWidget {
+  const _FoldersView({required this.viewMode});
+
+  final String viewMode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final folders = ref.watch(mediaFoldersProvider);
+    final assets = ref.watch(mediaAssetsProvider);
+
+    return folders.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('加载失败：$e')),
+      data: (list) {
+        if (list.isEmpty) {
+          return const Center(
+            child: EmptyState(
+              icon: Icons.photo_library_outlined,
+              title: '素材库还空着',
+              subtitle: '链接本地目录后，图片/视频素材会出现在这里。',
+            ),
+          );
+        }
+        // 目录分组：每个目录一块（标题行 + 素材网格）
+        final blocks = <Widget>[];
+        for (final folder in list) {
+          final assetsOf =
+              assets.value?.where((a) => a.folderId == folder.id).toList() ??
+                  const <MediaAssetRow>[];
+          blocks.add(_FolderHeader(folder: folder));
+          if (assetsOf.isEmpty) {
+            blocks.add(Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                '（目录下没有媒体文件）',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ));
+          } else if (viewMode == 'grid') {
+            blocks.add(
+              LayoutBuilder(
+                builder: (ctx, cons) {
+                  final width = cons.maxWidth;
+                  final columns = width >= 1000 ? 5 : (width >= 700 ? 4 : 3);
+                  const spacing = 12.0;
+                  final cardW = (width - spacing * (columns - 1)) / columns;
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    children: [
+                      for (final a in assetsOf)
+                        SizedBox(
+                          width: cardW,
+                          height: cardW,
+                          child: _AssetGridTile(asset: a),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            );
+          } else {
+            // 列表模式：缩略图 + 文件名 + 用途
+            for (final a in assetsOf) {
+              blocks.add(_AssetListTile(asset: a));
+            }
+          }
+        }
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: blocks,
+        );
+      },
+    );
+  }
+}
+
+/// 目录头：名称 + 用途 + 菜单（改用途 / 取消链接）。
+class _FolderHeader extends ConsumerWidget {
+  const _FolderHeader({required this.folder});
+
+  final MediaFolderRow folder;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 14, 4, 10),
+      child: Row(
+        children: [
+          Icon(Icons.folder, size: 20, color: scheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  folder.name,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                if (folder.purpose != null && folder.purpose!.isNotEmpty)
+                  Text(
+                    '用途：${folder.purpose}',
+                    style:
+                        TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                  ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'purpose') {
+                _editPurpose(context, ref);
+              } else if (v == 'unlink') {
+                _unlink(context, ref);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'purpose', child: Text('修改用途')),
+              PopupMenuItem(value: 'unlink', child: Text('取消链接目录')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editPurpose(BuildContext context, WidgetRef ref) async {
+    final ctrl = TextEditingController(text: folder.purpose ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('目录用途'),
+        content: TextField(controller: ctrl),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      ref.read(mediaRepositoryProvider).updateFolderPurpose(
+            folder.id,
+            result.isEmpty ? null : result,
+          );
+      ref.invalidate(mediaFoldersProvider);
+    }
+  }
+
+  void _unlink(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('取消链接「${folder.name}」？'),
+        content: const Text('只移除素材索引，本地文件不会删除。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('取消链接'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      ref.read(mediaRepositoryProvider).unlinkFolder(folder.id);
+      ref.invalidate(mediaFoldersProvider);
+      ref.invalidate(mediaAssetsProvider);
+    }
+  }
+}
+
+/// 素材网格项（图片缩略 / 视频首帧）。
+class _AssetGridTile extends ConsumerStatefulWidget {
+  const _AssetGridTile({required this.asset});
 
   final MediaAssetRow asset;
 
   @override
-  ConsumerState<_AssetTile> createState() => _AssetTileState();
+  ConsumerState<_AssetGridTile> createState() => _AssetGridTileState();
 }
 
-class _AssetTileState extends ConsumerState<_AssetTile> {
+class _AssetGridTileState extends ConsumerState<_AssetGridTile> {
+  VideoPlayerController? _video;
+  bool _videoReady = false;
+  bool _selected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.asset.type == 'video' && File(widget.asset.path).existsSync()) {
+      _initVideo();
+    }
+  }
+
+  Future<void> _initVideo() async {
+    final ctrl = VideoPlayerController.file(File(widget.asset.path));
+    _video = ctrl;
+    try {
+      await ctrl.initialize();
+      if (mounted) setState(() => _videoReady = true);
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _video?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final path = widget.asset.path;
+    final fileExists = path.isNotEmpty && File(path).existsSync();
+
+    return Column(
+      children: [
+        Expanded(
+          child: Card(
+            margin: EdgeInsets.zero,
+            elevation: 0,
+            clipBehavior: Clip.antiAlias,
+            color: scheme.surfaceContainerLow,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (widget.asset.type == 'video' && _videoReady)
+                  _VideoPreview(controller: _video!)
+                else if (fileExists)
+                  GestureDetector(
+                    onTap: _openAssetPage,
+                    onLongPress: () => setState(() => _selected = !_selected),
+                    child: Image.file(
+                      File(path),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _broken(scheme),
+                    ),
+                  )
+                else
+                  _broken(scheme),
+                if (_selected)
+                  Container(
+                    color: scheme.primary.withValues(alpha: 0.15),
+                    child: const Icon(Icons.check_circle,
+                        color: Colors.white, size: 32),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+          child: Row(
+            children: [
+              Icon(
+                widget.asset.type == 'video'
+                    ? Icons.videocam_outlined
+                    : Icons.image_outlined,
+                size: 12,
+                color: scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Text(
+                  widget.asset.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openAssetPage() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _AssetDetailSheet(asset: widget.asset),
+    );
+  }
+
+  Widget _broken(ColorScheme scheme) {
+    return Container(
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+      alignment: Alignment.center,
+      child: Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
+    );
+  }
+}
+
+/// 素材详情页：查看大图 + 用途 + 操作（改用途 / 取消链接）。
+class _AssetDetailSheet extends ConsumerWidget {
+  const _AssetDetailSheet({required this.asset});
+
+  final MediaAssetRow asset;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('素材', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              asset.name,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            // 大图
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: _AssetDetailMedia(asset: asset),
+            ),
+            const SizedBox(height: 16),
+            Text('用途说明', style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: 6),
+            Text(
+              asset.purpose == null || asset.purpose!.isEmpty
+                  ? '未填写'
+                  : asset.purpose!,
+              style: TextStyle(
+                  fontSize: 14,
+                  color: asset.purpose == null
+                      ? scheme.onSurfaceVariant
+                      : scheme.onSurface),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _editPurpose(context, ref),
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('编辑用途'),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  style:
+                      OutlinedButton.styleFrom(foregroundColor: scheme.error),
+                  onPressed: () => _unlink(context, ref),
+                  icon: const Icon(Icons.link_off, size: 16),
+                  label: const Text('取消链接'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editPurpose(BuildContext context, WidgetRef ref) async {
+    final ctrl = TextEditingController(text: asset.purpose ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('素材用途'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '这张图/视频是干嘛用的'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      await ref
+          .read(mediaRepositoryProvider)
+          .setAssetPurpose([asset.id], result.isEmpty ? null : result);
+      ref.invalidate(mediaAssetsProvider);
+    }
+  }
+
+  void _unlink(BuildContext context, WidgetRef ref) {
+    ref.read(mediaRepositoryProvider).unlinkAsset(asset.id);
+    ref.invalidate(mediaAssetsProvider);
+    Navigator.of(context).pop();
+  }
+}
+
+/// 素材大图（详情页）。
+class _AssetDetailMedia extends StatefulWidget {
+  const _AssetDetailMedia({required this.asset});
+
+  final MediaAssetRow asset;
+
+  @override
+  State<_AssetDetailMedia> createState() => _AssetDetailMediaState();
+}
+
+class _AssetDetailMediaState extends State<_AssetDetailMedia> {
   VideoPlayerController? _video;
   bool _videoReady = false;
 
@@ -108,9 +545,7 @@ class _AssetTileState extends ConsumerState<_AssetTile> {
     try {
       await ctrl.initialize();
       if (mounted) setState(() => _videoReady = true);
-    } catch (_) {
-      // 无法解码：显示静图占位
-    }
+    } catch (_) {}
   }
 
   @override
@@ -122,75 +557,72 @@ class _AssetTileState extends ConsumerState<_AssetTile> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final path = widget.asset.path;
-    final fileExists = path.isNotEmpty && File(path).existsSync();
-
-    return Padding(
-      padding: const EdgeInsets.all(2),
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        clipBehavior: Clip.antiAlias,
-        color: scheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: widget.asset.type == 'video' && _videoReady
-                  ? _VideoPreview(controller: _video!)
-                  : (fileExists
-                      ? Image.file(
-                          File(path),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _broken(scheme),
-                        )
-                      : _broken(scheme)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.asset.type == 'video'
-                        ? Icons.videocam_outlined
-                        : Icons.image_outlined,
-                    size: 14,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      widget.asset.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+    if (widget.asset.type == 'video' && _videoReady) {
+      return _VideoPreview(controller: _video!);
+    }
+    if (File(widget.asset.path).existsSync()) {
+      return Image.file(
+        File(widget.asset.path),
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => Icon(
+          Icons.broken_image_outlined,
+          color: scheme.onSurfaceVariant,
         ),
-      ),
-    );
+      );
+    }
+    return Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant);
   }
+}
 
-  Widget _broken(ColorScheme scheme) {
-    return Container(
-      color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-      alignment: Alignment.center,
-      child: Icon(
-        Icons.broken_image_outlined,
-        color: scheme.onSurfaceVariant,
-        size: 32,
+/// 素材列表项（列表模式）。
+class _AssetListTile extends StatelessWidget {
+  const _AssetListTile({required this.asset});
+
+  final MediaAssetRow asset;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: File(asset.path).existsSync() && asset.type == 'image'
+                ? Image.file(File(asset.path),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(
+                        Icons.broken_image_outlined,
+                        color: scheme.onSurfaceVariant))
+                : Icon(Icons.videocam_outlined, color: scheme.onSurfaceVariant),
+          ),
+        ),
+        title: Text(asset.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          asset.purpose == null || asset.purpose!.isEmpty
+              ? '图片 · 未填写用途${asset.type == 'video' ? '（视频）' : ''}'
+              : asset.purpose!,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+        ),
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => _AssetDetailSheet(asset: asset),
+        ),
       ),
     );
   }
 }
 
-/// 视频预览（静音循环首帧播放）。
+/// 视频预览（静音循环播放首帧）。
 class _VideoPreview extends StatefulWidget {
   const _VideoPreview({required this.controller});
 
@@ -224,7 +656,6 @@ class _VideoPreviewState extends State<_VideoPreview> {
 }
 
 /// 素材渲染（图片 / 视频首帧）——收藏弹层与记忆库卡片共用。
-/// 给定素材 id → 查素材 → 渲染；素材缺失显示占位。
 class SourceMediaView extends ConsumerStatefulWidget {
   const SourceMediaView({super.key, required this.assetId, this.height = 160});
 
@@ -276,11 +707,8 @@ class _SourceMediaViewState extends ConsumerState<SourceMediaView> {
       child = Container(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
         alignment: Alignment.center,
-        child: Icon(
-          Icons.broken_image_outlined,
-          color: scheme.onSurfaceVariant,
-          size: 28,
-        ),
+        child:
+            Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
       );
     } else if (asset.type == 'video' && _videoReady && _video != null) {
       child = FittedBox(

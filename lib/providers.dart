@@ -9,6 +9,7 @@ import 'data/database/database.dart';
 import 'data/dictionary/dictionary_service.dart';
 import 'data/repositories/item_repository.dart';
 import 'data/repositories/media_repository.dart';
+import 'data/repositories/memory_set_repository.dart';
 import 'data/repositories/review_repository.dart';
 import 'data/settings/settings_store.dart';
 import 'data/speech/speech_service.dart';
@@ -78,6 +79,30 @@ final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
 /// 素材列表（新在前）。
 final mediaAssetsProvider = FutureProvider<List<MediaAssetRow>>((ref) {
   return ref.watch(mediaRepositoryProvider).all();
+});
+
+/// 素材目录列表（新在前）。
+final mediaFoldersProvider = FutureProvider<List<MediaFolderRow>>((ref) {
+  return ref.watch(mediaRepositoryProvider).folders();
+});
+
+/// 记忆集仓储（记忆教练：自建复习集合）。
+final memorySetRepositoryProvider = Provider<MemorySetRepository>((ref) {
+  return MemorySetRepository(
+    ref.watch(databaseProvider),
+    items: ref.watch(itemRepositoryProvider),
+  );
+});
+
+/// 记忆集列表（新在前）。
+final memorySetsProvider = FutureProvider<List<MemorySetRow>>((ref) {
+  return ref.watch(memorySetRepositoryProvider).all();
+});
+
+/// 记忆集详情（含条目），按 id 缓存。
+final memorySetDetailProvider =
+    FutureProvider.autoDispose.family<MemorySetWithItems, int>((ref, setId) {
+  return ref.watch(memorySetRepositoryProvider).detail(setId);
 });
 
 final reviewRepositoryProvider = Provider<ReviewRepository>((ref) {

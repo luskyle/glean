@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:shiyi/data/database/database.dart';
 import 'package:shiyi/data/repositories/media_repository.dart';
 import 'package:shiyi/data/sync/sync_snapshot.dart';
@@ -70,11 +71,42 @@ void main() {
     final dup = await repo.addFile(f.path);
     expect(dup.id, asset.id);
 
-    await repo.unlink(asset.id);
+    await repo.setAssetPurpose([asset.id], '备考截图');
+    expect((await repo.all()).first.purpose, '备考截图');
+
+    await repo.unlinkAsset(asset.id);
     final remaining = await repo.all();
     expect(remaining, isEmpty);
     // 原文件仍在
     expect(f.existsSync(), isTrue);
+  });
+
+  test('目录管理：链接带用途 / 取消链接整目录 / 更新用途', () async {
+    final dir = await Directory.systemTemp.createTemp('media_folder');
+    addTearDown(() => dir.delete(recursive: true));
+    final f = File('${dir.path}/pic.jpg')..writeAsBytesSync(List.filled(8, 1));
+
+    // 链接目录 + 用途
+    await repo.linkFolder(dir.path, purpose: '备考截图');
+    final folders = await repo.folders();
+    expect(folders, hasLength(1));
+    expect(folders.first.purpose, '备考截图');
+    expect(folders.first.name, p.basename(dir.path));
+
+    // 目录内素材带 folderId
+    final assets = await repo.assetsOfFolder(folders.first.id);
+    expect(assets, hasLength(1));
+    expect(assets.first.folderId, folders.first.id);
+
+    // 更新用途
+    await repo.updateFolderPurpose(folders.first.id, '课程海报');
+    expect((await repo.folders()).first.purpose, '课程海报');
+
+    // 取消链接整目录：目录 + 素材索引都清，文件保留
+    await repo.unlinkFolder(folders.first.id);
+    expect(await repo.folders(), isEmpty);
+    expect(await repo.assetsOfFolder(folders.first.id), isEmpty);
+    expect(f.existsSync(), isTrue, reason: '取消链接不删原文件');
   });
 
   test('同步快照排除 mediaAssetId（素材仅本地使用）', () async {
