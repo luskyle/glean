@@ -259,7 +259,13 @@ class _HomeShellState extends ConsumerState<HomeShell>
             icon: const Icon(Icons.add),
             onPressed: () => _openAddSheet(),
           ),
-          // 设置入口在侧栏底部；窄屏在 AppBar——此处不重复
+          // 设置唯一入口：记忆库页顶栏（侧栏不放设置，避免重复）
+          if (tabIndex == 2)
+            IconButton(
+              tooltip: '设置',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => _openSettings(),
+            ),
         ],
       ),
     );

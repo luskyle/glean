@@ -6,7 +6,6 @@ import '../../core/theme.dart';
 import '../../data/database/database.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
-import '../settings/settings_screen.dart';
 
 /// iOS 风格侧边栏（HIG Sidebar）：大标题 + 分组导航 + 底部设置。
 ///
@@ -105,6 +104,15 @@ class DesktopSidebar extends ConsumerWidget {
                 child:
                     Text('分组', style: Theme.of(context).textTheme.labelSmall),
               ),
+              // ---- 新建分类 ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                child: _SidebarRow(
+                  icon: Icons.add,
+                  label: '新建分类',
+                  onTap: () => _createCollection(context, ref),
+                ),
+              ),
               Flexible(
                 child: SingleChildScrollView(
                   child: collections.when(
@@ -120,6 +128,8 @@ class DesktopSidebar extends ConsumerWidget {
                                 ref.watch(libraryFilterProvider).collectionId ==
                                     c.id,
                             onTap: () => _openCollection(ref, c),
+                            onLongPress: () =>
+                                _deleteCollection(context, ref, c),
                           ),
                       ],
                     ),
@@ -127,24 +137,70 @@ class DesktopSidebar extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              // ---- 底部（设置）----
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: _SidebarRow(
-                  icon: Icons.settings,
-                  label: '设置',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const SettingsScreen(),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _createCollection(BuildContext context, WidgetRef ref) async {
+    final ctrl = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('新建分类'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: '如：英语、读书、灵感'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      final repo = ref.read(itemRepositoryProvider);
+      await repo.createCollection(name);
+      ref.invalidate(collectionsProvider);
+    }
+  }
+
+  Future<void> _deleteCollection(
+    BuildContext context,
+    WidgetRef ref,
+    CollectionRow c,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('删除分类「${c.name}」？'),
+        content: const Text('分类里的内容会移到「未分类」，内容不会被删除。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(itemRepositoryProvider).deleteCollection(c.id);
+      ref.invalidate(collectionsProvider);
+      ref.invalidate(collectionStatsProvider);
+    }
   }
 
   bool _isAllView(WidgetRef ref) =>
@@ -211,6 +267,7 @@ class _SidebarRow extends StatelessWidget {
     required this.onTap,
     this.selected = false,
     this.badge = 0,
+    this.onLongPress,
   });
 
   final IconData icon;
@@ -218,6 +275,7 @@ class _SidebarRow extends StatelessWidget {
   final bool selected;
   final int badge;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -231,6 +289,7 @@ class _SidebarRow extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           child: Row(

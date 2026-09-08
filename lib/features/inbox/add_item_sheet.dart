@@ -152,6 +152,34 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
               textInputAction: TextInputAction.newline,
             ),
             const SizedBox(height: 14),
+            // ---- 分类选择（主界面直接可选）----
+            collections.when(
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (cols) => Align(
+                alignment: Alignment.centerLeft,
+                child: DropdownButton<int?>(
+                  value: _collectionId,
+                  underline: const SizedBox.shrink(),
+                  hint: const Text('放到未分类'),
+                  icon: const Icon(Icons.folder_outlined, size: 20),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('未分类'),
+                    ),
+                    ...cols.where((c) => c.isSystem || c.id != -1).map(
+                          (c) => DropdownMenuItem<int?>(
+                            value: c.id,
+                            child: Text(c.name),
+                          ),
+                        ),
+                  ],
+                  onChanged: (v) => setState(() => _collectionId = v),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
             // ---- 收起/展开更多 ----
             InkWell(
               onTap: () => setState(() => _moreOpen = !_moreOpen),
@@ -164,7 +192,7 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '更多选项',
+                    '更多选项 · 释义可改',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -197,52 +225,19 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
                 decoration: const InputDecoration(labelText: '备注（为什么收）'),
               ),
               const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _tagCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '标签',
-                        hintText: '回车添加',
-                      ),
-                      onSubmitted: (t) {
-                        final tag = t.trim();
-                        if (tag.isNotEmpty) {
-                          setState(() => _tags.add(tag));
-                          _tagCtrl.clear();
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: collections.when(
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                      data: (cols) => DropdownButtonFormField<int?>(
-                        initialValue: _collectionId,
-                        decoration: const InputDecoration(
-                          labelText: '分组',
-                        ),
-                        items: [
-                          const DropdownMenuItem<int?>(
-                            value: null,
-                            child: Text('未分类'),
-                          ),
-                          ...cols.map(
-                            (c) => DropdownMenuItem<int?>(
-                              value: c.id,
-                              child: Text(c.name),
-                            ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => _collectionId = v),
-                      ),
-                    ),
-                  ),
-                ],
+              TextField(
+                controller: _tagCtrl,
+                decoration: const InputDecoration(
+                  labelText: '标签',
+                  hintText: '回车添加',
+                ),
+                onSubmitted: (t) {
+                  final tag = t.trim();
+                  if (tag.isNotEmpty) {
+                    setState(() => _tags.add(tag));
+                    _tagCtrl.clear();
+                  }
+                },
               ),
               if (_tags.isNotEmpty)
                 Padding(
