@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  :root { --blue: #2F6BFF; --ink: #1B2430; --ink2: #5A6B80; }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 320px; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--ink); padding: 16px;
+  }
+  h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  h1 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue); }
+  .field { margin-top: 12px; }
+  label { font-size: 12px; color: var(--ink2); display: block; margin-bottom: 4px; }
+  textarea, select, input {
+    width: 100%; border: 1px solid #E3E9F2; border-radius: 10px;
+    padding: 8px 10px; font-size: 13px; background: #F6F8FC;
+  }
+  textarea { min-height: 56px; resize: vertical; }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .row select { flex: 1; width: auto; }
+  button {
+    border: none; border-radius: 10px; padding: 9px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .primary { background: var(--blue); color: #fff; flex: 1; }
+  .ghost { background: #F1F3F7; color: var(--ink2); }
+  .msg { font-size: 12px; margin-top: 8px; min-height: 16px; }
+  .msg.ok { color: #1E8E4E; } .msg.err { color: #C62828; }
+  details { margin-top: 12px; }
+  summary { font-size: 12px; color: var(--ink2); cursor: pointer; }
+  .tiny { font-size: 11px; color: var(--ink2); margin-top: 6px; }
+</style>
+</head>
+<body>
+  <h1><span class="dot"></span>拾忆 · 划词收藏</h1>
+
+  <div class="field">
+    <label>要收藏的内容（划选后自动带入）</label>
+    <textarea id="text" placeholder="单词、句子、灵感…（自动推断语言，明天开始复习）"></textarea>
+  </div>
+
+  <input type="hidden" id="pageUrl" />
+
+  <div class="row">
+    <select id="collection"><option value="">未分类</option></select>
+    <button class="ghost" id="btnSettings">设置</button>
+    <button class="primary" id="btnSave">收藏</button>
+  </div>
+  <div class="msg" id="msg"></div>
+
+  <details id="settingsBox">
+    <summary>WebDAV 设置（坚果云等）</summary>
+    <div class="field">
+      <label>地址</label>
+      <input id="davUrl" placeholder="https://dav.jianguoyun.com/dav/" />
+    </div>
+    <div class="field">
+      <label>账号</label>
+      <input id="davUser" placeholder="坚果云账号" />
+    </div>
+    <div class="field">
+      <label>应用密码</label>
+      <input id="davPass" type="password" placeholder="坚果云「安全选项→应用密码」" />
+    </div>
+    <button class="primary" id="btnSaveCfg" style="margin-top:10px;">保存设置并刷新分类</button>
+    <p class="tiny">收藏数据写入你的私人云盘（shiyi/backup.json），服务器零存储；桌面/移动端打开拾忆自动合并进收件箱。</p>
+  </details>
+
+  <script src="snapshot.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
