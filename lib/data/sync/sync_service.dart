@@ -5,8 +5,13 @@ import '../database/database.dart';
 import 'cloud_drive.dart';
 import 'sync_snapshot.dart';
 
-/// 云盘同步服务（B 档）：
+/// 云盘同步服务（B 档，多端合并模式）：
 /// 全量快照 → 用户自有云盘（iCloud Drive / WebDAV）；恢复时幂等合并入库。
+///
+/// 多端模型（浏览器插件 / 桌面 / 移动共用同一份快照契约）：
+/// - 无账号：用户云盘即身份（C 档账号留待 V2）
+/// - [syncNow]：先拉取远端并合并（按 id 幂等并包，本地已存在行保留），
+///   再推送合并后的全量——两端各自新增互不丢失，同 id 编辑冲突本地优先。
 ///
 /// 依据《收藏数据存储方案》：媒体与全文永不进入自家服务器；
 /// 这里同步的只有文本元数据 + 复习日志。
@@ -15,6 +20,27 @@ class SyncService {
 
   final AppDatabase db;
   final CloudDrive cloud;
+
+  /// 多端同步：拉取远端 → 幂等合并 → 推送全量。成功返回 null，失败返回错误文案。
+  Future<String?> syncNow() async {
+    final pull = await _pullMerge();
+    if (pull != null) return pull;
+    return backup();
+  }
+
+  Future<String?> _pullMerge() async {
+    if (!await cloud.isAvailable()) return '${cloud.name} 不可用，请先配置';
+    try {
+      final text = await cloud.download();
+      if (text == null || text.isEmpty) return null; // 无远端备份：仅推送
+      final snap = SyncSnapshot.decode(text);
+      await merge(db, snap);
+      return null;
+    } catch (e, st) {
+      debugPrint('同步拉取失败：$e\n$st');
+      return '同步失败：$e';
+    }
+  }
 
   /// 备份到云盘，成功返回 null，失败返回错误文案。
   Future<String?> backup() async {
@@ -149,9 +175,9 @@ class SyncService {
   }
 
   DateTime _date(Object? v) {
-    if (v is int) return DateTime.fromMillisecondsSinceEpoch(v * 1000);
+    // drift toJson 将 DateTime 序列化为 epoch 微秒（int）
     if (v is num) {
-      return DateTime.fromMillisecondsSinceEpoch((v * 1000).round());
+      return DateTime.fromMicrosecondsSinceEpoch(v.round());
     }
     return DateTime.parse(v as String);
   }

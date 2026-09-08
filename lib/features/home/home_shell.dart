@@ -43,6 +43,10 @@ class _HomeShellState extends ConsumerState<HomeShell>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ref.read(analyticsProvider).track(AnalyticsEvents.appOpen);
+    // 多端云盘同步：启动时拉取远端并合并（静默，失败不影响使用）
+    ref.read(syncServiceProvider).syncNow().then((err) {
+      if (err != null) debugPrint('启动同步跳过：$err');
+    });
     // 词库引导：载入 JLPT 词库资产（内存索引 + words 表），失败静默
     ref.read(dictionaryBootstrapProvider.future).catchError((_) {});
     // 剪贴板监听：创建 watcher 并启动（设置里可关闭）
@@ -255,11 +259,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
             icon: const Icon(Icons.add),
             onPressed: () => _openAddSheet(),
           ),
-          IconButton(
-            tooltip: '设置',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => _openSettings(),
-          ),
+          // 设置入口在侧栏底部；窄屏在 AppBar——此处不重复
         ],
       ),
     );
