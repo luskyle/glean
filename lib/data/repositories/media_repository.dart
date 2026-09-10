@@ -59,6 +59,14 @@ class MediaRepository {
 
     // 扫描目录素材并入索引（挂 folderId）
     final files = await _scanMediaFiles(dirPath);
+    // 收养历史孤儿：同目录下 folder_id 为空的旧行补挂到本目录
+    // （早期版本曾漏写 folderId，且 unlinkFolder 残留 NULL 行）
+    if (files.isNotEmpty) {
+      final paths = files.map((f) => f.path).toList();
+      await (db.update(db.mediaAssets)
+            ..where((t) => t.folderId.isNull() & t.path.isIn(paths)))
+          .write(MediaAssetsCompanion(folderId: drift.Value(folderId)));
+    }
     final existing = await all();
     final knownPaths = existing.map((a) => a.path).toSet();
 
