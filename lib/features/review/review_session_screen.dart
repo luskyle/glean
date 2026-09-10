@@ -6,7 +6,6 @@ import '../../data/repositories/item_repository.dart';
 import '../../domain/srs/sm2.dart';
 import '../../providers.dart';
 import 'curve_screen.dart';
-import 'flashcard.dart';
 
 /// 复习会话：闪卡先猜后看 + 三键评级（忘了/模糊/记得）。
 ///
@@ -21,13 +20,15 @@ class ReviewSessionScreen extends ConsumerStatefulWidget {
 }
 
 class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
+  static const _groupSize = 6; // 卡片墙：一屏一组
+
   List<CardWithItem> _queue = const [];
-  int _index = 0;
+  int _groupStart = 0;
+  final Set<int> _groupRated = {}; // 当前组内已评级卡（组内相对下标）
   int _answered = 0;
   int _qualitySum = 0;
   bool _loading = true;
   bool _finished = false;
-  bool _flipped = false;
 
   @override
   void initState() {
@@ -46,8 +47,15 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
     });
   }
 
-  Future<void> _rate(ReviewRating rating) async {
-    final card = _queue[_index].card;
+  /// 当前组卡片（组内相对下标 0..n-1）。
+  List<CardWithItem> get _group => _queue.sublist(
+        _groupStart,
+        (_groupStart + _groupSize).clamp(0, _queue.length),
+      );
+
+  /// 评级并落库；组内全部评完自动切下一组。
+  Future<void> _rate(int localIndex, ReviewRating rating) async {
+    final card = _queue[_groupStart + localIndex].card;
     final quality = sm2QualityFor(rating);
     ref.read(analyticsProvider).track(
       AnalyticsEvents.reviewRating,
@@ -60,21 +68,30 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
     setState(() {
       _answered += 1;
       _qualitySum += quality;
-      if (_index + 1 >= _queue.length) {
+      _groupRated.add(localIndex);
+    });
+    ref.invalidate(dueCardsProvider);
+    ref.invalidate(reviewOverviewProvider);
+    ref.invalidate(quotaProvider);
+    if (_groupRated.length >= _group.length) {
+      _nextGroup();
+    }
+  }
+
+  void _nextGroup() {
+    final completed = _groupStart + _groupSize >= _queue.length;
+    setState(() {
+      _groupStart += _groupSize;
+      _groupRated.clear();
+      if (completed) {
         _finished = true;
-      } else {
-        _index += 1;
-        _flipped = false;
       }
     });
-    if (_finished) {
+    if (completed) {
       ref.read(analyticsProvider).track(
         AnalyticsEvents.reviewSessionCompleted,
         props: {'count': _answered},
       );
-      ref.invalidate(dueCardsProvider);
-      ref.invalidate(reviewOverviewProvider);
-      ref.invalidate(quotaProvider);
     }
   }
 
@@ -87,11 +104,11 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
       return _buildCompletion();
     }
 
-    final card = _queue[_index].card;
-    final progress = _queue.isEmpty ? 0.0 : _index / _queue.length;
+    final group = _group;
+    final progress = _queue.isEmpty ? 0.0 : _answered / _queue.length;
 
     return Scaffold(
-      appBar: AppBar(title: Text('复习 · ${_index + 1}/${_queue.length}')),
+      appBar: AppBar(title: Text('复习 · $_answered/${_queue.length}')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -100,62 +117,40 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
               LinearProgressIndicator(
                   value: progress, borderRadius: BorderRadius.circular(4)),
               const SizedBox(height: 16),
+              // 卡片墙：一屏一组，每张独立翻转 + 评级
               Expanded(
-                child: Flashcard(
-                  key: ValueKey(card.id),
-                  front: CardFace(
-                    hint: '点按翻面，先回忆再看答案',
-                    child: Text(
-                      card.prompt,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1160),
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 14,
+                        crossAxisSpacing: 14,
+                        childAspectRatio: 1.35,
+                      ),
+                      itemCount: group.length,
+                      itemBuilder: (_, i) => _WallCard(
+                        key: ValueKey(group[i].card.id),
+                        item: group[i],
+                        rated: _groupRated.contains(i),
+                        onRate: (r) => _rate(i, r),
+                      ),
                     ),
                   ),
-                  back: CardFace(
-                    child: SelectableText(
-                      card.answer.isEmpty ? '（无答案）' : card.answer,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  onFlip: () => setState(() => _flipped = !_flipped),
                 ),
               ),
-              const SizedBox(height: 20),
-              if (_flipped)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _RatingButton(
-                      label: '忘了',
-                      icon: Icons.sentiment_very_dissatisfied,
-                      color: Colors.redAccent,
-                      onPressed: () => _rate(ReviewRating.forgot),
+              const SizedBox(height: 14),
+              Text(
+                _groupRated.length >= group.length
+                    ? '本组完成，进入下一组…'
+                    : '点击卡片翻面看答案，再评级：忘了 / 模糊 / 记得',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    _RatingButton(
-                      label: '模糊',
-                      icon: Icons.sentiment_neutral,
-                      color: Colors.amber.shade700,
-                      onPressed: () => _rate(ReviewRating.fuzzy),
-                    ),
-                    _RatingButton(
-                      label: '记得',
-                      icon: Icons.sentiment_satisfied_alt,
-                      color: Colors.green.shade600,
-                      onPressed: () => _rate(ReviewRating.remembered),
-                    ),
-                  ],
-                )
-              else
-                Text(
-                  '先回忆，再点卡片看答案',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
+              ),
             ],
           ),
         ),
@@ -211,39 +206,178 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
   }
 }
 
-class _RatingButton extends StatelessWidget {
-  const _RatingButton({
+/// 卡片墙单卡：点击翻面，背面可评级；已评级盖绿色对勾。
+class _WallCard extends StatefulWidget {
+  const _WallCard({
+    super.key,
+    required this.item,
+    required this.rated,
+    required this.onRate,
+  });
+
+  final CardWithItem item;
+  final bool rated;
+  final ValueChanged<ReviewRating> onRate;
+
+  @override
+  State<_WallCard> createState() => _WallCardState();
+}
+
+class _WallCardState extends State<_WallCard> {
+  bool _flipped = false;
+
+  @override
+  void didUpdateWidget(covariant _WallCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 评级完成后回到正面，展示对勾
+    if (!oldWidget.rated && widget.rated && _flipped) {
+      _flipped = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AnimatedOpacity(
+      opacity: widget.rated ? 0.45 : 1,
+      duration: const Duration(milliseconds: 220),
+      child: GestureDetector(
+        onTap: widget.rated
+            ? null
+            : () => setState(() => _flipped = !_flipped),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _flipped ? _back() : _front(),
+              ),
+              if (widget.rated)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.check_circle,
+                      color: Colors.green, size: 44),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _front() {
+    return Center(
+      key: const ValueKey('front'),
+      child: SingleChildScrollView(
+        child: Text(
+          widget.item.card.prompt,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  Widget _back() {
+    return Column(
+      key: const ValueKey('back'),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Text(
+              widget.item.card.answer.isEmpty ? '（无答案）' : widget.item.card.answer,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _MiniRate(
+              label: '忘了',
+              icon: Icons.sentiment_very_dissatisfied,
+              color: Colors.redAccent,
+              onTap: () => widget.onRate(ReviewRating.forgot),
+            ),
+            _MiniRate(
+              label: '模糊',
+              icon: Icons.sentiment_neutral,
+              color: Colors.amber.shade700,
+              onTap: () => widget.onRate(ReviewRating.fuzzy),
+            ),
+            _MiniRate(
+              label: '记得',
+              icon: Icons.sentiment_satisfied_alt,
+              color: Colors.green.shade600,
+              onTap: () => widget.onRate(ReviewRating.remembered),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 卡片墙上的迷你评级按钮。
+class _MiniRate extends StatelessWidget {
+  const _MiniRate({
     required this.label,
     required this.icon,
     required this.color,
-    required this.onPressed,
+    required this.onTap,
   });
 
   final String label;
   final IconData icon;
   final Color color;
-  final VoidCallback onPressed;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // 整列可点：按钮 + 标签一起响应评级
-    return GestureDetector(
-      onTap: onPressed,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton.large(
-            heroTag: label,
-            backgroundColor: color.withValues(alpha: 0.15),
-            foregroundColor: color,
-            onPressed: onPressed,
-            child: Icon(icon),
+    return Material(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(label,
-              style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-        ],
+        ),
       ),
     );
   }
