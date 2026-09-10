@@ -10,6 +10,8 @@ import '../../domain/tagging/language.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
 import '../library/library_screen.dart';
+import '../library/media_library_screen.dart';
+import '../memory/memory_manager_screen.dart';
 import '../review/curve_screen.dart';
 import '../review/review_screen.dart';
 import '../settings/settings_screen.dart';
@@ -33,7 +35,7 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
-  static const _titles = ['今日复习', '收藏', '学习'];
+  static const _titles = ['今日复习', '收藏', '学习', '素材库', '记忆管理'];
   static const _wideBreakpoint = 900.0;
 
   /// 顶栏全局搜索框控制器（宽屏）。
@@ -196,7 +198,14 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   Widget _buildWide(BuildContext context, int tabIndex) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
+    return PopScope(
+      canPop: tabIndex < 3,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && tabIndex >= 3) {
+          ref.read(homeTabIndexProvider.notifier).state = 0;
+        }
+      },
+      child: Scaffold(
       body: Row(
         children: [
           DesktopSidebar(
@@ -210,8 +219,10 @@ class _HomeShellState extends ConsumerState<HomeShell>
           Expanded(
             child: Column(
               children: [
-                _buildTopBar(context, scheme, tabIndex),
-                const Divider(height: 1),
+                if (tabIndex < 3) ...[
+                  _buildTopBar(context, scheme, tabIndex),
+                  const Divider(height: 1),
+                ],
                 Expanded(
                   child: Center(
                     child: ConstrainedBox(
@@ -222,6 +233,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
                           ReviewScreen(active: tabIndex == 0),
                           LibraryScreen(active: tabIndex == 1),
                           StudyScreen(active: tabIndex == 2),
+                          const MediaLibraryScreen(),
+                          const MemoryManagerScreen(),
                         ],
                       ),
                     ),
@@ -232,6 +245,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
           ),
         ],
       ),
+      ), // PopScope
     );
   }
 
