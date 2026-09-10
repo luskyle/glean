@@ -145,26 +145,22 @@ class _FoldersView extends ConsumerWidget {
               ),
             ));
           } else if (viewMode == 'grid') {
+            // iPhone 相册风格：紧凑正方形小格子密度排列，无文字
             blocks.add(
-              LayoutBuilder(
-                builder: (ctx, cons) {
-                  final width = cons.maxWidth;
-                  final columns = width >= 1000 ? 5 : (width >= 700 ? 4 : 3);
-                  const spacing = 12.0;
-                  final cardW = (width - spacing * (columns - 1)) / columns;
-                  return Wrap(
-                    spacing: spacing,
-                    runSpacing: spacing,
-                    children: [
-                      for (final a in assetsOf)
-                        SizedBox(
-                          width: cardW,
-                          height: cardW,
-                          child: _AssetGridTile(asset: a),
-                        ),
-                    ],
-                  );
-                },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Wrap(
+                  spacing: 3,
+                  runSpacing: 3,
+                  children: [
+                    for (final a in assetsOf)
+                      SizedBox(
+                        width: 120,
+                        height: 120,
+                        child: _AssetGridTile(asset: a),
+                      ),
+                  ],
+                ),
               ),
             );
           } else {
@@ -332,68 +328,56 @@ class _AssetGridTileState extends ConsumerState<_AssetGridTile> {
     final path = widget.asset.path;
     final fileExists = path.isNotEmpty && File(path).existsSync();
 
-    return Column(
-      children: [
-        Expanded(
-          child: Card(
-            margin: EdgeInsets.zero,
-            elevation: 0,
-            clipBehavior: Clip.antiAlias,
-            color: scheme.surfaceContainerLow,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (widget.asset.type == 'video' && _videoReady)
-                  _VideoPreview(controller: _video!)
-                else if (fileExists)
-                  GestureDetector(
-                    onTap: _openAssetPage,
-                    onLongPress: () => setState(() => _selected = !_selected),
-                    child: Image.file(
-                      File(path),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _broken(scheme),
-                    ),
-                  )
-                else
-                  _broken(scheme),
-                if (_selected)
-                  Container(
-                    color: scheme.primary.withValues(alpha: 0.15),
-                    child: const Icon(Icons.check_circle,
-                        color: Colors.white, size: 32),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
-          child: Row(
-            children: [
-              Icon(
-                widget.asset.type == 'video'
-                    ? Icons.videocam_outlined
-                    : Icons.image_outlined,
-                size: 12,
-                color: scheme.onSurfaceVariant,
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      color: scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (widget.asset.type == 'video' && _videoReady)
+            _VideoPreview(controller: _video!)
+          else if (fileExists)
+            GestureDetector(
+              onTap: _openAssetPage,
+              onLongPress: () => setState(() => _selected = !_selected),
+              child: Image.file(
+                File(path),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _broken(scheme),
               ),
-              const SizedBox(width: 3),
-              Expanded(
-                child: Text(
-                  widget.asset.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w500),
+            )
+          else
+            _broken(scheme),
+          // 视频角标
+          if (widget.asset.type == 'video')
+            Positioned(
+              right: 4,
+              bottom: 4,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(4),
                 ),
+                child: const Icon(Icons.videocam,
+                    size: 12, color: Colors.white),
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          // 选中态
+          if (_selected)
+            Positioned.fill(
+              child: Container(
+                color: scheme.primary.withValues(alpha: 0.15),
+                alignment: Alignment.center,
+                child: const Icon(Icons.check_circle,
+                    color: Colors.white, size: 32),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
