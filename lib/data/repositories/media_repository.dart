@@ -161,17 +161,47 @@ class MediaRepository {
     }
   }
 
-  /// 递归扫描目录下的媒体文件。
+  /// 递归扫描目录下的媒体文件（支持符号链接跟随）。
   Future<List<File>> _scanMediaFiles(String dirPath) async {
     final dir = Directory(dirPath);
     if (!await dir.exists()) return const [];
     final results = <File>[];
-    await for (final entry in dir.list(recursive: true, followLinks: false)) {
-      if (entry is File && _isMedia(entry.path)) {
-        results.add(entry);
+    _scanSync(dir, results, {});
+    return results;
+  }
+
+  void _scanSync(Directory dir, List<File> results, Set<String> visited) {
+    // 防止符号链接循环
+    final real = dir.resolveSymbolicLinksSync();
+    if (!visited.add(real)) return;
+
+    List<FileSystemEntity> entries;
+    try {
+      entries = dir.listSync();
+    } on FileSystemException {
+      return; // 无权限：跳过整个子目录
+    }
+
+    for (final entry in entries) {
+      try {
+        if (entry is File) {
+          if (_isMedia(entry.path)) results.add(entry);
+        } else if (entry is Directory) {
+          _scanSync(entry, results, visited);
+        } else if (entry is Link) {
+          // 跟随符号链接：检测目标类型
+          final target = entry.resolveSymbolicLinksSync();
+          final type = FileSystemEntity.typeSync(target);
+          if (type == FileSystemEntityType.file && _isMedia(target)) {
+            results.add(File(target));
+          } else if (type == FileSystemEntityType.directory) {
+            _scanSync(Directory(target), results, visited);
+          }
+        }
+      } on FileSystemException {
+        // 单个文件/链接异常（如断链、无权限），跳过继续
       }
     }
-    return results;
   }
 
   bool _isMedia(String path) {
