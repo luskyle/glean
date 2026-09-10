@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../core/theme.dart';
 import '../../data/database/database.dart';
 import '../../providers.dart';
 import '../../shared/empty_state.dart';
@@ -21,6 +23,14 @@ class MediaLibraryScreen extends ConsumerStatefulWidget {
 
 class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
   String _viewMode = 'grid';
+  final PageController _pageCtrl = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +62,12 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
           ),
         ],
       ),
-      body: _FoldersView(viewMode: _viewMode),
+      body: _LibraryBody(
+        viewMode: _viewMode,
+        controller: _pageCtrl,
+        currentIndex: _page,
+        onPageChanged: (i) => setState(() => _page = i),
+      ),
     );
   }
 
@@ -105,11 +120,19 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
   }
 }
 
-/// 目录级视图：目录卡片列表 + 目录内素材网格/列表。
-class _FoldersView extends ConsumerWidget {
-  const _FoldersView({required this.viewMode});
+/// 素材库主体：目录页滑动切换（PageView）+ 底部固定目录 tab 条。
+class _LibraryBody extends ConsumerWidget {
+  const _LibraryBody({
+    required this.viewMode,
+    required this.controller,
+    required this.currentIndex,
+    required this.onPageChanged,
+  });
 
   final String viewMode;
+  final PageController controller;
+  final int currentIndex;
+  final ValueChanged<int> onPageChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -129,52 +152,157 @@ class _FoldersView extends ConsumerWidget {
             ),
           );
         }
-        // 目录分组：每个目录一块（标题行 + 素材网格）
-        final blocks = <Widget>[];
-        for (final folder in list) {
-          final assetsOf =
-              assets.value?.where((a) => a.folderId == folder.id).toList() ??
-                  const <MediaAssetRow>[];
-          blocks.add(_FolderHeader(folder: folder));
-          if (assetsOf.isEmpty) {
-            blocks.add(Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Text(
-                '（目录下没有媒体文件）',
-                style: Theme.of(context).textTheme.bodySmall,
+        return Column(
+          children: [
+            Expanded(
+              child: PageView.builder(
+                controller: controller,
+                onPageChanged: onPageChanged,
+                itemCount: list.length,
+                itemBuilder: (_, i) => _FolderContent(
+                  folder: list[i],
+                  assets: assets.value ?? const [],
+                  viewMode: viewMode,
+                ),
               ),
-            ));
-          } else if (viewMode == 'grid') {
-            // iPhone 相册风格：紧凑正方形小格子密度排列，无文字
-            blocks.add(
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Wrap(
-                  spacing: 3,
-                  runSpacing: 3,
+            ),
+            // 底部目录 tab（iOS 相机模式条风格，可见最多 5 项）
+            _FolderTabBar(
+              folders: list,
+              currentIndex: currentIndex,
+              onSelect: (i) => controller.animateToPage(
+                i,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// 单个目录页：目录头 + 素材网格/列表。
+class _FolderContent extends StatelessWidget {
+  const _FolderContent({
+    required this.folder,
+    required this.assets,
+    required this.viewMode,
+  });
+
+  final MediaFolderRow folder;
+  final List<MediaAssetRow> assets;
+  final String viewMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final assetsOf = assets.where((a) => a.folderId == folder.id).toList();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      children: [
+        _FolderHeader(folder: folder),
+        if (assetsOf.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Text(
+              '（目录下没有媒体文件）',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          )
+        else if (viewMode == 'grid')
+          // iPhone 相册风格：紧凑正方形小格子密度排列，无文字
+          Wrap(
+            spacing: 3,
+            runSpacing: 3,
+            children: [
+              for (final a in assetsOf)
+                SizedBox(
+                  width: 120,
+                  height: 120,
+                  child: _AssetGridTile(asset: a),
+                ),
+            ],
+          )
+        else
+          for (final a in assetsOf) _AssetListTile(asset: a),
+      ],
+    );
+  }
+}
+
+/// 底部目录 tab 条：横向滑动切换链接的目录；每项固定宽，
+/// 可见最多 5 个（超出部分左右滑动查看更多）。
+class _FolderTabBar extends StatelessWidget {
+  const _FolderTabBar({
+    required this.folders,
+    required this.currentIndex,
+    required this.onSelect,
+  });
+
+  final List<MediaFolderRow> folders;
+  final int currentIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final screenW = MediaQuery.sizeOf(context).width;
+    // 每项宽 = 屏宽 1/5（最多 5 个可见），窄屏兜底 84
+    final itemWidth = math.max(math.min(screenW / 5, 132.0), 84.0);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+      ),
+      child: SizedBox(
+        height: 56,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          itemCount: folders.length,
+          itemBuilder: (_, i) {
+            final selected = i == currentIndex;
+            return InkWell(
+              onTap: () => onSelect(i),
+              child: SizedBox(
+                width: itemWidth,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    for (final a in assetsOf)
-                      SizedBox(
-                        width: 120,
-                        height: 120,
-                        child: _AssetGridTile(asset: a),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: selected ? 28 : 0,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: AppTheme.systemBlue,
+                        borderRadius: BorderRadius.circular(2),
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      folders[i].name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w400,
+                        color: selected
+                            ? AppTheme.systemBlue
+                            : scheme.onSurface,
+                      ),
+                    ),
                   ],
                 ),
               ),
             );
-          } else {
-            // 列表模式：缩略图 + 文件名 + 用途
-            for (final a in assetsOf) {
-              blocks.add(_AssetListTile(asset: a));
-            }
-          }
-        }
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: blocks,
-        );
-      },
+          },
+        ),
+      ),
     );
   }
 }
