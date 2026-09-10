@@ -47,3 +47,4 @@ flutter:
   assets:
     - lib/assets/dictionary/
     - lib/assets/poetry/
+    - lib/assets/content/

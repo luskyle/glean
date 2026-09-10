@@ -1,0 +1,26 @@
+{
+  "version": "2026-09",
+  "note": "趣味常识单选（quiz 玩法示例插件）",
+  "items": [
+    {"prompt": "中国的国花是？", "options": ["牡丹", "梅花", "兰花", "菊花"], "answer": 0, "explanation": "中国国花为牡丹（民间通说）。"},
+    {"prompt": "太阳系中最大的行星是？", "options": ["地球", "木星", "土星", "火星"], "answer": 1, "explanation": "木星半径约为地球的 11 倍。"},
+    {"prompt": "《静夜思》的作者是？", "options": ["杜甫", "王维", "李白", "白居易"], "answer": 2, "explanation": "「床前明月光」出自李白。"},
+    {"prompt": "人体最大的器官是？", "options": ["肝脏", "皮肤", "肺", "心脏"], "answer": 1, "explanation": "皮肤覆盖全身，是最大器官。"},
+    {"prompt": "「一纳米」约等于多少米？", "options": ["10⁻⁶", "10⁻⁹", "10⁻¹²", "10⁻³"], "answer": 1, "explanation": "1 nm = 10⁻⁹ m。"},
+    {"prompt": "水的化学式是？", "options": ["CO₂", "O₂", "H₂O", "NaCl"], "answer": 2, "explanation": "水由两个氢原子和一个氧原子组成。"},
+    {"prompt": "一年有多少个星期？", "options": ["约 48", "约 50", "约 52", "约 54"], "answer": 2, "explanation": "365 ÷ 7 ≈ 52.14。"},
+    {"prompt": "长城主要在哪个朝代大规模修筑？", "options": ["秦", "汉", "唐", "明"], "answer": 3, "explanation": "现存长城多为明代修筑。"},
+    {"prompt": "光在真空中的速度约为？", "options": ["30 万 km/s", "3 万 km/s", "300 km/s", "3 000 km/s"], "answer": 0, "explanation": "约 299 792 km/s。"},
+    {"prompt": "《三国演义》的作者是？", "options": ["施耐庵", "罗贯中", "吴承恩", "曹雪芹"], "answer": 1, "explanation": "罗贯中著《三国演义》。"},
+    {"prompt": "声音在下列哪种介质中传播最快？", "options": ["空气", "水", "钢铁", "真空"], "answer": 2, "explanation": "固体中分子间距小，传声最快；真空中不能传声。"},
+    {"prompt": "「电脑」CPU 的中文全称是？", "options": ["中央处理器", "图形处理器", "内存条", "硬盘"], "answer": 0, "explanation": "Central Processing Unit。"},
+    {"prompt": "地球上约多少面积被海洋覆盖？", "options": ["约 50%", "约 61%", "约 71%", "约 81%"], "answer": 2, "explanation": "海洋约占地球表面 71%。"},
+    {"prompt": "古诗「春眠不觉晓」的作者是？", "options": ["孟浩然", "贺知章", "王昌龄", "杜牧"], "answer": 0, "explanation": "《春晓》为孟浩然所作。"},
+    {"prompt": "下列哪个是元音字母？", "options": ["b", "c", "e", "f"], "answer": 2, "explanation": "英语五个元音字母：a e i o u。"},
+    {"prompt": "世界卫生组织简称？", "options": ["WTO", "WHO", "IMF", "UNESCO"], "answer": 1, "explanation": "World Health Organization。"},
+    {"prompt": "「珠穆朗玛峰」海拔约？", "options": ["6 848 m", "7 848 m", "8 848 m", "9 848 m"], "answer": 2, "explanation": "约 8 848.86 米。"},
+    {"prompt": "下列哪项是可再生能源？", "options": ["煤炭", "石油", "风能", "天然气"], "answer": 2, "explanation": "风能可循环再生。"},
+    {"prompt": "一天中影子最短的时刻通常是？", "options": ["早晨", "正午", "傍晚", "午夜"], "answer": 1, "explanation": "太阳最高，影子最短。"},
+    {"prompt": "「白兔捣药」的神话人物是？", "options": ["嫦娥", "织女", "精卫", "女娲"], "answer": 0, "explanation": "嫦娥奔月，月中有白兔捣药。"}
+  ]
+}

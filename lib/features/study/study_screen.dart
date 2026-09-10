@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../content/builtin_plugins.dart';
+import '../../content/content_plugin.dart';
 import '../../data/dictionary/language_catalog.dart';
 import '../../providers.dart';
 import '../../shared/empty_state.dart';
 import '../../shared/ios_large_title.dart';
 import '../settings/paywall_sheet.dart';
-import 'poetry_session_screen.dart';
+import 'content_player_screen.dart';
 import 'study_level_screen.dart';
 
 /// 学习 Tab：按语言主动学习（新词闪卡 → 自动进入 SRS 复习队列）。
@@ -55,50 +57,106 @@ class StudyScreen extends ConsumerWidget {
             },
           ),
         const SizedBox(height: 20),
-        // 非语言玩法：古诗词填空
+        // ---- 内容插件（可扩展：翻卡 / 单选 / 填空） ----
         Text(
-          '经典诵读',
+          '内容插件',
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
         const SizedBox(height: 8),
-        Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const PoetrySessionScreen(),
-              ),
-            ),
-            leading: Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.auto_stories, size: 20),
-            ),
-            title: const Text(
-              '古诗词',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            subtitle: const Text('随机一首古诗，在划线处补全字词。'),
-            trailing: Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
+        FutureBuilder<List<ContentPlugin>>(
+          future: ContentRegistry.builtin(),
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return Text('插件加载失败：${snap.error}');
+            }
+            final plugins = snap.data ?? const <ContentPlugin>[];
+            return Column(
+              children: [
+                for (final p in plugins)
+                  _PluginCard(
+                    plugin: p,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ContentPlayerScreen(plugin: p),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ],
+    );
+  }
+}
+
+/// 内容插件卡片：图标 + 名称 + 玩法标签。
+class _PluginCard extends StatelessWidget {
+  const _PluginCard({required this.plugin, required this.onTap});
+
+  final ContentPlugin plugin;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (icon, tag) = switch (plugin.kind) {
+      ContentKind.flashcard => (Icons.style_outlined, '翻卡'),
+      ContentKind.quiz => (Icons.quiz_outlined, '单选'),
+      ContentKind.cloze => (Icons.auto_stories, '填空'),
+    };
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        onTap: onTap,
+        leading: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 20, color: scheme.primary),
+        ),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                plugin.name,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                tag,
+                style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          '${plugin.description} · 共 ${plugin.items.length} 项',
+          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+        ),
+        trailing: Icon(
+          Icons.chevron_right,
+          size: 20,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 }
