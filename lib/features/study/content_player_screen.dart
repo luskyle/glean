@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../content/content_plugin.dart';
 import '../../domain/poetry/poetry_puzzle.dart';
-import '../review/flashcard.dart';
 
 /// 内容插件统一播放器：按插件玩法（翻卡 / 单选 / 填空）分发渲染。
 /// 逐题推进 + 进度条 + 完成页统计；自评 / 答题结果不自动入 SRS
@@ -207,25 +206,13 @@ class _ContentPlayerScreenState extends ConsumerState<ContentPlayerScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Flashcard(
-          key: ValueKey('fc-$_index'),
-          front: CardFace(
-            hint: item.hint,
-            child: Text(
-              item.front,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w700),
-            ),
+        // 简单翻转：无 3D Transform，规避动画中重建的渲染断言
+        GestureDetector(
+          onTap: () => setState(() => _flipped = !_flipped),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: _flipped ? _fcBack(item) : _fcFront(item),
           ),
-          back: CardFace(
-            child: SelectableText(
-              item.back,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18),
-            ),
-          ),
-          onFlip: () => setState(() => _flipped = !_flipped),
         ),
         const SizedBox(height: 24),
         if (_flipped)
@@ -251,12 +238,68 @@ class _ContentPlayerScreenState extends ConsumerState<ContentPlayerScreen> {
           )
         else
           Text(
-            '先回忆，点卡片看答案',
+            item.hint ?? '先回忆，点卡片看答案',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
           ),
       ],
+    );
+  }
+
+  Widget _fcFront(FlashcardItem item) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const ValueKey('fc-front'),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 260),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          item.front,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  Widget _fcBack(FlashcardItem item) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const ValueKey('fc-back'),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 260),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          item.back,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 18, height: 1.5),
+        ),
+      ),
     );
   }
 

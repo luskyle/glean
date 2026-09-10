@@ -261,10 +261,8 @@ class _WallCardState extends State<_WallCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: _flipped ? _back() : _front(),
-              ),
+              // 条件渲染（无动画切换，规避动画中重建的渲染断言）
+              if (_flipped) _back() else _front(),
               if (widget.rated)
                 Container(
                   decoration: BoxDecoration(
