@@ -14,7 +14,7 @@ import 'sync_snapshot.dart';
 ///   再推送合并后的全量——两端各自新增互不丢失，同 id 编辑冲突本地优先。
 ///
 /// 依据《收藏数据存储方案》：媒体与全文永不进入自家服务器；
-/// 这里同步的只有文本元数据 + 复习日志。
+/// 这里同步的只有文本元数据（收藏条目/分组/标签）。
 class SyncService {
   SyncService({required this.db, required this.cloud});
 
@@ -101,36 +101,12 @@ class SyncService {
               mode: InsertMode.insertOrIgnore,
             );
       }
-      for (final raw in rows['cards'] as List? ?? const []) {
-        final m = raw as Map<String, dynamic>;
-        if (tombstones.contains('cards|${m['id']}')) continue; // 墓碑：跳过复活
-        await db.into(db.cards).insert(
-              CardsCompanion(
-                id: Value(m['id'] as int),
-                wordId: Value(m['wordId'] as int?),
-                kind: Value(m['kind'] as String? ?? 'word'),
-                prompt: Value(m['prompt'] as String),
-                answer: Value(m['answer'] as String),
-                audioFile: Value(m['audioFile'] as String?),
-                lang: Value(m['lang'] as String?),
-                tags: Value(m['tags'] as String?),
-                repetitions: Value(m['repetitions'] as int? ?? 0),
-                easeFactor: Value((m['easeFactor'] as num? ?? 2.5).toDouble()),
-                intervalDays: Value(m['intervalDays'] as int? ?? 0),
-                dueAt: Value(_date(m['dueAt'])),
-                lastReviewedAt: Value(_dateOrNull(m['lastReviewedAt'])),
-                createdAt: Value(_date(m['createdAt'])),
-              ),
-              mode: InsertMode.insertOrIgnore,
-            );
-      }
       for (final raw in rows['items'] as List? ?? const []) {
         final m = raw as Map<String, dynamic>;
         if (tombstones.contains('items|${m['id']}')) continue;
         await db.into(db.items).insert(
               ItemsCompanion(
                 id: Value(m['id'] as int),
-                cardId: Value(m['cardId'] as int?),
                 source: Value(m['source'] as String? ?? 'manual'),
                 mediaPath: Value(m['mediaPath'] as String?),
                 originalUrl: Value(m['originalUrl'] as String?),
@@ -143,22 +119,7 @@ class SyncService {
               mode: InsertMode.insertOrIgnore,
             );
       }
-      for (final raw in rows['review_logs'] as List? ?? const []) {
-        final m = raw as Map<String, dynamic>;
-        await db.into(db.reviewLogs).insert(
-              ReviewLogsCompanion(
-                id: Value(m['id'] as int),
-                cardId: Value(m['cardId'] as int),
-                reviewedAt: Value(_date(m['reviewedAt'])),
-                quality: Value(m['quality'] as int),
-                intervalDays: Value(m['intervalDays'] as int),
-                easeFactor: Value((m['easeFactor'] as num).toDouble()),
-                state: Value(m['state'] as String),
-                source: Value(m['source'] as String? ?? 'review'),
-              ),
-              mode: InsertMode.insertOrIgnore,
-            );
-      }
+      // 旧快照中的 cards / review_logs 段：Glean 已无对应表，忽略不合并
       for (final raw in rows['item_collections'] as List? ?? const []) {
         final m = raw as Map<String, dynamic>;
         // 所属条目已被墓碑删除 → 跳过（避免外键悬空）
@@ -192,10 +153,5 @@ class SyncService {
       return DateTime.fromMicrosecondsSinceEpoch(v.round());
     }
     return DateTime.parse(v as String);
-  }
-
-  DateTime? _dateOrNull(Object? v) {
-    if (v == null || (v is String && v.isEmpty)) return null;
-    return _date(v);
   }
 }

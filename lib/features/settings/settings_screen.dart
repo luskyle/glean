@@ -3,66 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/analytics/analytics_service.dart';
 import '../../data/export/export_service.dart';
-import '../../data/settings/settings_store.dart';
 import '../../providers.dart';
 import 'cloud_backup_section.dart';
-import 'paywall_sheet.dart';
 
-/// 设置：订阅 / 偏好 / 数据所有权 / 关于。
+/// 设置：偏好 / 数据所有权 / 关于。
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final quota = ref.watch(quotaProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ---- 订阅 ----
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.workspace_premium_outlined),
-                  title: const Text('拾忆 Pro'),
-                  subtitle: quota.when(
-                    loading: () => const Text('…'),
-                    error: (_, __) => const Text('升级解锁无限额度'),
-                    data: (q) => Text(q.isPro
-                        ? '已解锁：无限复习 · 无限卡片'
-                        : '免费版：无限复习 · 卡片库 100 张'),
-                  ),
-                  trailing: FilledButton.tonal(
-                    onPressed: () => PaywallSheet.show(
-                      context: context,
-                      reason: '解锁无限复习与无限卡片库',
-                    ),
-                    child: const Text('升级'),
-                  ),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.pie_chart_outline),
-                  title: const Text('当前额度'),
-                  subtitle: quota.when(
-                    loading: () => const Text('…'),
-                    error: (_, __) => const Text('—'),
-                    data: (q) => Text(
-                      q.isPro
-                          ? '无限'
-                          : '已复习 ${q.reviewsToday} 次 · '
-                              '记忆库 ${q.libraryCards}/${Quota.maxLibraryCards} 张',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
           // ---- 云盘备份（B 档）----
           const CloudBackupSection(),
           const SizedBox(height: 12),
@@ -131,7 +87,7 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.file_download_outlined),
                   title: const Text('导出我的收藏库'),
-                  subtitle: const Text('元数据 + 复习日志 → 本地 zip（JSON 机器可读）'),
+                  subtitle: const Text('收藏元数据 → 本地 zip（JSON 机器可读）'),
                   onTap: () async {
                     final messenger = ScaffoldMessenger.of(context);
                     try {
@@ -156,11 +112,11 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: const Text('数据默认只存在本机，不强制登录；服务器不存储你的媒体文件'),
                   onTap: () => showAboutDialog(
                     context: context,
-                    applicationName: '拾忆',
+                    applicationName: 'Glean',
                     applicationVersion: '0.1.0',
                     children: const [
                       Text(
-                        '· 收藏与复习数据默认仅保存在本机\n'
+                        '· 收藏数据默认仅保存在本机\n'
                         '· 所有生成内容均可编辑、可删除\n'
                         '· 导出 / 删除即删，随时拿回数据\n'
                         '· 服务器永不接收媒体文件（存储铁律）',
@@ -175,8 +131,8 @@ class SettingsScreen extends ConsumerWidget {
           const Card(
             child: ListTile(
               leading: Icon(Icons.info_outline),
-              title: Text('关于拾忆'),
-              subtitle: Text('把你想记住的任何东西收进来，它会在对的时间提醒你复习。'),
+              title: Text('关于 Glean'),
+              subtitle: Text('把散落的好内容拾进来：收件箱 / 剪贴板 / 素材库 / 分类。'),
             ),
           ),
         ],

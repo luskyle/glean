@@ -71,22 +71,3 @@ class LanguageBadge extends StatelessWidget {
     );
   }
 }
-
-/// 卡种图标（词条/语录/灵感/剪藏）。
-IconData kindIcon(String kind) {
-  return switch (kind) {
-    'quote' => Icons.format_quote,
-    'idea' => Icons.lightbulb_outline,
-    'clip' => Icons.link,
-    _ => Icons.translate,
-  };
-}
-
-String kindLabel(String kind) {
-  return switch (kind) {
-    'quote' => '语录',
-    'idea' => '灵感',
-    'clip' => '剪藏',
-    _ => '词条',
-  };
-}

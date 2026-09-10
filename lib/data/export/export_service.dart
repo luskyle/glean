@@ -7,9 +7,9 @@ import 'package:path_provider/path_provider.dart';
 
 import '../database/database.dart';
 
-/// 一键导出：收藏元数据 + 复习日志 → 本地 zip（JSON 机器可读 + 说明）。
+/// 一键导出：收藏元数据 → 本地 zip（JSON 机器可读 + 说明）。
 /// 依据《收藏数据存储方案》§8：数据所有权在用户侧，导出是基本承诺。
-/// zip 内布局：`shiyi_data.json` + `README.txt`（media/ 目录随图片收藏扩展）。
+/// zip 内布局：`glean_data.json` + `README.txt`。
 class ExportService {
   ExportService({Directory? directory}) : _overrideDirectory = directory;
 
@@ -26,38 +26,34 @@ class ExportService {
     await exportDir.create(recursive: true);
 
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final zipPath = p.join(exportDir.path, 'shiyi_export_$timestamp.zip');
+    final zipPath = p.join(exportDir.path, 'glean_export_$timestamp.zip');
 
     final items = await db.select(db.items).get();
-    final cards = await db.select(db.cards).get();
-    final logs = await db.select(db.reviewLogs).get();
     final collections = await db.select(db.collections).get();
 
     final payload = <String, Object?>{
-      'app': 'shiyi',
+      'app': 'glean',
       'version': '0.1.0',
       'exported_at': DateTime.now().toIso8601String(),
       'collections': collections
           .map((c) => {'id': c.id, 'name': c.name, 'is_system': c.isSystem})
           .toList(),
       'items': items.map((i) => i.toJson()).toList(),
-      'cards': cards.map((c) => c.toJson()).toList(),
-      'review_logs': logs.map((l) => l.toJson()).toList(),
     };
 
     final archive = Archive()
       ..addFile(
         ArchiveFile.string(
-          'shiyi_data.json',
+          'glean_data.json',
           const JsonEncoder.withIndent('  ').convert(payload),
         ),
       )
       ..addFile(
         ArchiveFile.string(
           'README.txt',
-          '拾忆导出包 $timestamp\n'
-              '说明：shiyi_data.json 为全量数据（收藏条目/卡片/复习日志/分组），\n'
-              '字段见各对象键名，机器可读；可导入 Anki 或任意分析工具。\n'
+          'Glean 收藏助手导出包 $timestamp\n'
+              '说明：glean_data.json 为全量数据（收藏条目/分组），\n'
+              '字段见各对象键名，机器可读；可导入任意分析工具。\n'
               '数据默认仅存本机，导出即归属；删除数据请联系「设置 → 隐私与数据」。\n',
         ),
       );

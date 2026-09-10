@@ -6,14 +6,14 @@ import 'core/theme.dart';
 import 'features/home/home_shell.dart';
 import 'providers.dart';
 
-/// 拾忆 App 根组件。
-class ShiyiApp extends ConsumerWidget {
-  const ShiyiApp({super.key});
+/// Glean 收藏助手根组件。
+class GleanApp extends ConsumerWidget {
+  const GleanApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: '拾忆',
+      title: 'Glean',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

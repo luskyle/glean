@@ -65,11 +65,3 @@ class SettingsStore {
   Future<void> markBackupNow() => _prefs.setString(
       'settings.last_backup_at', DateTime.now().toIso8601String());
 }
-
-/// 免费额度（非 Pro）。
-class Quota {
-  const Quota._();
-
-  static const int maxLibraryCards = 100;
-  static const int maxDailyReviews = 9999; // 已移除每日复习次数限制
-}

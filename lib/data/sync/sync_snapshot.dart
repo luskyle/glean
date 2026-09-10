@@ -13,10 +13,11 @@ class SyncSnapshot {
   String encode() => const JsonEncoder.withIndent(' ').convert(payload);
 
   /// 构建当前库的全量快照。
+  ///
+  /// 兼容契约：快照仍带 `app: shiyi`（浏览器插件等旧写入端共同约定）；
+  /// 旧快照里的 cards/review_logs 段在合并时被忽略（Glean 已无对应表）。
   static Future<SyncSnapshot> capture(AppDatabase db) async {
     final items = await db.select(db.items).get();
-    final cards = await db.select(db.cards).get();
-    final logs = await db.select(db.reviewLogs).get();
     final collections = await db.select(db.collections).get();
     final links = await db.select(db.itemCollections).get();
     final tags = await db.select(db.itemTags).get();
@@ -28,8 +29,8 @@ class SyncSnapshot {
       'rows': <String, Object?>{
         'collections': collections.map((c) => c.toJson()).toList(),
         'items': items.map((i) => i.toJson()..remove('mediaAssetId')).toList(),
-        'cards': cards.map((c) => c.toJson()).toList(),
-        'review_logs': logs.map((l) => l.toJson()).toList(),
+        'cards': <Object?>[],
+        'review_logs': <Object?>[],
         'item_collections': links.map((l) => l.toJson()).toList(),
         'item_tags': tags.map((t) => t.toJson()).toList(),
       },

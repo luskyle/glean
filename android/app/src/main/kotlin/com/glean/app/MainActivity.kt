@@ -1,4 +1,4 @@
-package com.shiyi.shiyi
+package com.glean.app
 
 import io.flutter.embedding.android.FlutterActivity
 

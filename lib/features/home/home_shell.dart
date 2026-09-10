@@ -9,22 +9,18 @@ import '../../data/sync/local_notify_server.dart';
 import '../../domain/tagging/language.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
-import '../library/library_screen.dart';
+import '../inbox/inbox_screen.dart';
 import '../library/media_library_screen.dart';
-import '../memory/memory_manager_screen.dart';
-import '../review/curve_screen.dart';
-import '../review/review_screen.dart';
 import '../settings/settings_screen.dart';
-import '../study/study_screen.dart';
 import 'desktop_sidebar.dart';
 
-/// 当前 Tab（默认落点 = 复习页，见设计原则 2）。
+/// 当前 Tab（默认落点 = 收件箱）。
 final homeTabIndexProvider = StateProvider<int>((ref) => 0);
 
-/// 外壳：Cubox 式响应式布局。
+/// 外壳：Glean 三区布局（收件箱 / 素材库 / 设置）。
 ///
 /// - 宽屏（>= 900，桌面）：左侧收藏箱侧栏 + 顶栏搜索 + 内容区（IndexedStack 保状态）
-/// - 窄屏（移动）：底部三 Tab + 右上角"+"，与原设计一致
+/// - 窄屏（移动）：底部两 Tab + 右上角"+"，与原设计一致
 /// - 剪贴板监听（前台轮询，可设置关闭）→ 轻提示"有内容要收藏？"
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
@@ -35,7 +31,7 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
-  static const _titles = ['今日复习', '收藏', '学习', '素材库', '记忆管理'];
+  static const _titles = ['收件箱', '素材库'];
   static const _wideBreakpoint = 900.0;
 
   /// 顶栏全局搜索框控制器（宽屏）。
@@ -62,8 +58,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
         _quietSync();
       }
     });
-    // 词库引导：载入 JLPT 词库资产（内存索引 + words 表），失败静默
-    ref.read(dictionaryBootstrapProvider.future).catchError((_) {});
     // 剪贴板监听：创建 watcher 并启动（设置里可关闭）
     _watcher = ClipboardWatcher(
       readClipboard: _readClipboard,
@@ -144,23 +138,18 @@ class _HomeShellState extends ConsumerState<HomeShell>
           label: '收藏',
           onPressed: () async {
             final repo = ref.read(itemRepositoryProvider);
-            // 直接成卡（不再经过收件箱）：明天首复，来源记为剪贴板
-            await repo.createManualCard(
-              prompt: text.trim(),
-              answer: '（待补充答案）',
-              kind: text.trim().length > 20 ? 'idea' : 'word',
-              lang: langCodeOf(detectLang(text)),
+            await repo.createItem(
+              note: text.trim(),
               source: 'clipboard',
+              lang: langCodeOf(detectLang(text)),
             );
             ref.read(analyticsProvider).track(
               AnalyticsEvents.itemCollected,
               props: {'source': 'clipboard'},
             );
             ref.invalidate(libraryItemsProvider);
-            ref.invalidate(reviewOverviewProvider);
-            ref.invalidate(quotaProvider);
             messenger.showSnackBar(
-              const SnackBar(content: Text('已收藏，明天开始复习')),
+              const SnackBar(content: Text('已收藏到收件箱')),
             );
           },
         ),
@@ -199,53 +188,48 @@ class _HomeShellState extends ConsumerState<HomeShell>
   Widget _buildWide(BuildContext context, int tabIndex) {
     final scheme = Theme.of(context).colorScheme;
     return PopScope(
-      canPop: tabIndex < 3,
+      canPop: tabIndex < 1,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && tabIndex >= 3) {
+        if (!didPop && tabIndex > 0) {
           ref.read(homeTabIndexProvider.notifier).state = 0;
         }
       },
       child: Scaffold(
-      body: Row(
-        children: [
-          DesktopSidebar(
-            activeTab: tabIndex,
-            onSelectTab: (i) {
-              _trackTab(i);
-              ref.read(homeTabIndexProvider.notifier).state = i;
-            },
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: Column(
-              children: [
-                if (tabIndex < 3) ...[
+        body: Row(
+          children: [
+            DesktopSidebar(
+              activeTab: tabIndex,
+              onSelectTab: (i) {
+                _trackTab(i);
+                ref.read(homeTabIndexProvider.notifier).state = i;
+              },
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: Column(
+                children: [
                   _buildTopBar(context, scheme, tabIndex),
                   const Divider(height: 1),
-                ],
-                Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1280),
-                      child: IndexedStack(
-                        index: tabIndex,
-                        children: [
-                          ReviewScreen(active: tabIndex == 0),
-                          LibraryScreen(active: tabIndex == 1),
-                          StudyScreen(active: tabIndex == 2),
-                          const MediaLibraryScreen(),
-                          const MemoryManagerScreen(),
-                        ],
+                  Expanded(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1280),
+                        child: IndexedStack(
+                          index: tabIndex,
+                          children: const [
+                            InboxScreen(),
+                            MediaLibraryScreen(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-      ), // PopScope
     );
   }
 
@@ -284,9 +268,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
               onChanged: (v) {
-                // 输入即切到收藏/分组内容页并搜索
-                if (tabIndex != 1) {
-                  ref.read(homeTabIndexProvider.notifier).state = 1;
+                // 输入即切回收件箱并搜索
+                if (tabIndex != 0) {
+                  ref.read(homeTabIndexProvider.notifier).state = 0;
                 }
                 ref.read(libraryFilterProvider.notifier).state =
                     ref.read(libraryFilterProvider).copyWith(search: v);
@@ -294,12 +278,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
             ),
           ),
           const Spacer(),
-          if (tabIndex == 0)
-            IconButton(
-              tooltip: '遗忘曲线',
-              icon: const Icon(Icons.show_chart),
-              onPressed: () => _openCurve(),
-            ),
           // 收藏入口统一在侧栏右上角 ⊕；此处不放（避免重复）
           // 设置常驻顶栏：任何页面都可直接进入
           IconButton(
@@ -327,12 +305,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
             icon: const Icon(Icons.folder_outlined),
             onPressed: () => _openCollectionPicker(),
           ),
-          if (tabIndex == 0)
-            IconButton(
-              tooltip: '遗忘曲线',
-              icon: const Icon(Icons.show_chart),
-              onPressed: () => _openCurve(),
-            ),
           // 设置常驻顶栏：任何页面都可直接进入
           IconButton(
             tooltip: '设置',
@@ -343,10 +315,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
       ),
       body: IndexedStack(
         index: tabIndex,
-        children: [
-          ReviewScreen(active: tabIndex == 0),
-          LibraryScreen(active: tabIndex == 1),
-          StudyScreen(active: tabIndex == 2),
+        children: const [
+          InboxScreen(),
+          MediaLibraryScreen(),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -357,31 +328,28 @@ class _HomeShellState extends ConsumerState<HomeShell>
         label: const Text('收藏'),
       ),
       bottomNavigationBar: NavigationBar(
-        // 底栏两主 tab；分组内容（tabIndex==1）经顶栏分类入口进入，
-        // 无对应底栏项时回退高亮复习（0）
-        selectedIndex: tabIndex == 2 ? 1 : 0,
+        selectedIndex: tabIndex,
         onDestinationSelected: (i) {
-          final target = i == 0 ? 0 : 2;
-          _trackTab(target);
-          ref.read(homeTabIndexProvider.notifier).state = target;
+          _trackTab(i);
+          ref.read(homeTabIndexProvider.notifier).state = i;
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school),
-            label: '复习',
+            icon: Icon(Icons.inbox_outlined),
+            selectedIcon: Icon(Icons.inbox),
+            label: '收件箱',
           ),
           NavigationDestination(
-            icon: Icon(Icons.translate),
-            selectedIcon: Icon(Icons.translate),
-            label: '学习',
+            icon: Icon(Icons.photo_library_outlined),
+            selectedIcon: Icon(Icons.photo_library),
+            label: '素材库',
           ),
         ],
       ),
     );
   }
 
-  /// 窄屏分类入口：弹分组选择，点选后进入该分组内容（tab 1）。
+  /// 窄屏分类入口：弹分组选择，点选后进入该分组内容（tab 0）。
   Future<void> _openCollectionPicker() async {
     final cols = await ref.read(itemRepositoryProvider).collections();
     if (!mounted) return;
@@ -411,7 +379,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
       final id = int.tryParse(res);
       ref.read(libraryFilterProvider.notifier).state =
           ref.read(libraryFilterProvider).withCollection(id);
-      ref.read(homeTabIndexProvider.notifier).state = 1;
+      ref.read(homeTabIndexProvider.notifier).state = 0;
     }
   }
 
@@ -420,12 +388,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
       context: context,
       isScrollControlled: true,
       builder: (_) => const AddItemSheet(),
-    );
-  }
-
-  void _openCurve() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CurveScreen()),
     );
   }
 

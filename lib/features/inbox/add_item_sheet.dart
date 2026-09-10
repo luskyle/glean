@@ -3,17 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/analytics/analytics_service.dart';
 import '../../data/repositories/item_repository.dart';
-import '../../data/settings/settings_store.dart';
 import '../../domain/tagging/language.dart';
 import '../../providers.dart';
 import '../library/media_library_screen.dart';
-import '../settings/paywall_sheet.dart';
 
 /// 手录收藏：**一个输入框收藏，其余全自动**（零摩擦）。
 ///
-/// - 输入内容 → 自动识别语言、查词库补释义/读音、默认未分类
-/// - 「更多选项」折叠：类型 / 答案 / 备注 / 标签 / 分组（可后补）
-/// - 保存即成卡：进入记忆库 + SRS 首次排期（明天首复）
+/// - 输入内容 → 自动识别语言、默认未分类、进入收件箱
+/// - 「更多选项」折叠：类型 / 标签 / 本地素材 / 分组（可后补）
+/// - 类型（词条/语录/灵感）写入收藏来源（source），媒体优先记 photo
 class AddItemSheet extends ConsumerStatefulWidget {
   const AddItemSheet({super.key});
 
@@ -23,11 +21,8 @@ class AddItemSheet extends ConsumerStatefulWidget {
 
 class _AddItemSheetState extends ConsumerState<AddItemSheet> {
   final _contentCtrl = TextEditingController();
-  final _answerCtrl = TextEditingController();
-  final _noteCtrl = TextEditingController();
   final _tagCtrl = TextEditingController();
 
-  String _customAnswer = ''; // 词库自动补的释义（可人工改）
   bool _moreOpen = false;
   String _kind = 'auto';
   final Set<String> _tags = {};
@@ -37,24 +32,8 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
   @override
   void dispose() {
     _contentCtrl.dispose();
-    _answerCtrl.dispose();
-    _noteCtrl.dispose();
     _tagCtrl.dispose();
     super.dispose();
-  }
-
-  /// 输入变化 → 自动补卡面（词条命中词库则预填释义）。
-  void _autoFill() {
-    final text = _contentCtrl.text.trim();
-    if (text.isEmpty) return;
-    final dict = ref.read(dictionaryServiceProvider);
-    final hits = dict.lookup(text);
-    if (hits.isNotEmpty) {
-      setState(() {
-        _customAnswer = dict.buildWordAnswer(hits.first);
-        _answerCtrl.text = _customAnswer;
-      });
-    }
   }
 
   String _guessedKind(String text) {
@@ -73,42 +52,31 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
       return;
     }
 
-    final quota = await ref.read(quotaProvider.future);
-    if (quota.libraryFull) {
-      if (mounted) {
-        PaywallSheet.show(
-            context: context, reason: '记忆库已满 ${Quota.maxLibraryCards} 张');
-      }
-      return;
-    }
-
     final lang = langCodeOf(detectLang(content));
+    // 类型（词条/语录/灵感）→ source；媒体优先记 photo
     final kind = _kind == 'auto' ? _guessedKind(content) : _kind;
-    final answer = _answerCtrl.text.trim().isEmpty
-        ? (_customAnswer.isNotEmpty ? _customAnswer : '（待补充答案）')
-        : _answerCtrl.text.trim();
+    final source = _mediaAssetId != null
+        ? 'photo'
+        : (kind == 'word' || kind == 'quote' || kind == 'idea' ? kind : 'manual');
 
-    await ref.read(itemRepositoryProvider).createManualCard(
-          prompt: content,
-          answer: answer,
-          kind: kind,
+    await ref.read(itemRepositoryProvider).createItem(
+          note: content,
+          source: source,
           lang: lang,
           tags: _tags.toList(),
-          note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
           collectionId: _collectionId,
           mediaAssetId: _mediaAssetId,
         );
     ref.read(analyticsProvider).track(
       AnalyticsEvents.itemCollected,
-      props: {'source': 'manual', 'kind': kind},
+      props: {'source': source, 'kind': kind},
     );
 
     if (mounted) {
       Navigator.of(context).pop();
       ref.invalidate(libraryItemsProvider);
-      ref.invalidate(quotaProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已收藏，明天开始第一次复习')),
+        const SnackBar(content: Text('已收藏到收件箱')),
       );
     }
   }
@@ -138,16 +106,14 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
               controller: _contentCtrl,
               autofocus: true,
               maxLines: 3,
-              onChanged: (_) => _autoFill(),
               decoration: InputDecoration(
-                hintText: '想记住的内容：单词、句子、灵感…',
+                hintText: '想收藏的内容：单词、句子、灵感…',
                 suffixIcon: _contentCtrl.text.isEmpty
                     ? null
                     : IconButton(
                         icon: const Icon(Icons.clear, size: 18),
                         onPressed: () {
                           _contentCtrl.clear();
-                          _answerCtrl.clear();
                           setState(() {});
                         },
                       ),
@@ -195,7 +161,7 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '更多选项 · 释义可改',
+                    '更多选项',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -214,24 +180,10 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
                 onSelectionChanged: (s) => setState(() => _kind = s.first),
               ),
               const SizedBox(height: 12),
-              // ---- 本地素材（记忆教练：链接素材库，不导入）----
+              // ---- 本地素材（链接素材库，不导入）----
               _MediaPickerRow(
                 assetId: _mediaAssetId,
                 onChanged: (id) => setState(() => _mediaAssetId = id),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _answerCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: '答案 / 释义',
-                  hintText: '词库会自动补，可改',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _noteCtrl,
-                decoration: const InputDecoration(labelText: '备注（为什么收）'),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -268,7 +220,7 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
               child: FilledButton.icon(
                 onPressed: _save,
                 icon: const Icon(Icons.check),
-                label: const Text('收藏并安排复习'),
+                label: const Text('收藏'),
               ),
             ),
           ],

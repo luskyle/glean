@@ -8,31 +8,26 @@ part 'database.g.dart';
 
 const kSchemaVersion = 5;
 
-/// 拾忆主库（drift/SQLite）。
+/// Glean 收藏库（drift/SQLite）。
 ///
-/// 打开方式：`driftDatabase(name: 'shiyi')`（drift_flutter 一站式，
+/// 打开方式：`driftDatabase(name: 'glean')`（drift_flutter 一站式，
 /// 自带 sqlite3_flutter_libs 原生库与 path 处理；测试中改为内存库）。
 @DriftDatabase(
   tables: [
-    Words,
-    Cards,
     Items,
-    ReviewLogs,
     Collections,
     ItemCollections,
     ItemTags,
     SyncDeletions,
     MediaAssets,
     MediaFolders,
-    MemorySets,
-    MemorySetItems,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// 打开磁盘上的应用数据库（正式运行入口）。
-  factory AppDatabase.open() => AppDatabase(driftDatabase(name: 'shiyi'));
+  factory AppDatabase.open() => AppDatabase(driftDatabase(name: 'glean'));
 
   /// 测试用内存库。
   factory AppDatabase.forTesting() =>
@@ -50,8 +45,6 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 5) {
             await m.createTable(mediaFolders);
-            await m.createTable(memorySets);
-            await m.createTable(memorySetItems);
             await m.addColumn(mediaAssets, mediaAssets.folderId);
             await m.addColumn(mediaAssets, mediaAssets.purpose);
           }

@@ -2,13 +2,11 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shiyi/data/database/database.dart';
-import 'package:shiyi/data/repositories/item_repository.dart';
-import 'package:shiyi/data/repositories/review_repository.dart';
-import 'package:shiyi/data/sync/cloud_drive.dart';
-import 'package:shiyi/data/sync/sync_service.dart';
-import 'package:shiyi/data/sync/sync_snapshot.dart';
-import 'package:shiyi/domain/srs/sm2.dart';
+import 'package:glean/data/database/database.dart';
+import 'package:glean/data/repositories/item_repository.dart';
+import 'package:glean/data/sync/cloud_drive.dart';
+import 'package:glean/data/sync/sync_service.dart';
+import 'package:glean/data/sync/sync_snapshot.dart';
 
 void main() {
   late AppDatabase db;
@@ -25,39 +23,21 @@ void main() {
 
   Future<void> seed() async {
     final now = DateTime(2026, 9, 1, 10);
-    final cardId = await db.into(db.cards).insert(
-          CardsCompanion.insert(
-            kind: const drift.Value('word'),
-            prompt: 'remember',
-            answer: '记得',
-            lang: const drift.Value('en'),
-            dueAt: now,
-            createdAt: now,
-          ),
-        );
     await db.into(db.items).insert(
           ItemsCompanion.insert(
-            cardId: drift.Value(cardId),
             source: const drift.Value('manual'),
+            note: const drift.Value('remember'),
             lang: const drift.Value('en'),
-            status: const drift.Value('learning'),
+            status: const drift.Value('active'),
             createdAt: now,
           ),
         );
-    final repo = ReviewRepository(db);
-    await repo.reviewCard(
-      cardId: cardId,
-      rating: ReviewRating.remembered,
-      now: now,
-    );
   }
 
-  Future<({int cards, int items, int logs, int cols})> counts() async {
-    final c = (await db.select(db.cards).get()).length;
+  Future<({int items, int cols})> counts() async {
     final i = (await db.select(db.items).get()).length;
-    final l = (await db.select(db.reviewLogs).get()).length;
     final co = (await db.select(db.collections).get()).length;
-    return (cards: c, items: i, logs: l, cols: co);
+    return (items: i, cols: co);
   }
 
   test('本地通道：备份 → 清库 → 恢复 → 数据一致且幂等', () async {
@@ -67,17 +47,16 @@ void main() {
 
     await seed();
     final before = await counts();
-    expect(before.cards, greaterThan(0));
+    expect(before.items, greaterThan(0));
 
     // 备份
     expect(await svc.backup(), isNull);
     expect(await svc.cloudHasBackup(), isTrue);
 
     // 清空业务数据（保留系统分组种子无妨，直接全删）
-    await db.delete(db.cards).go(); // 级联 review_logs
     await db.delete(db.items).go();
     final cleared = await counts();
-    expect(cleared.cards, 0);
+    expect(cleared.items, 0);
 
     // 恢复
     try {
@@ -87,16 +66,13 @@ void main() {
       fail('restore 抛异常: $e\n$st');
     }
     final after = await counts();
-    expect(after.cards, before.cards);
     expect(after.items, before.items);
-    expect(after.logs, before.logs);
     expect(after.cols, before.cols);
 
     // 幂等：再恢复一次不重复
     await svc.restore();
     final again = await counts();
-    expect(again.cards, before.cards);
-    expect(again.logs, before.logs);
+    expect(again.items, before.items);
   });
 
   test('墓碑：删除分类后云端合并不会复活', () async {
@@ -139,23 +115,14 @@ void main() {
 
     // 浏览器式条目：带 originalUrl + sourceTitle
     final now = DateTime(2026, 9, 1, 10);
-    await db.into(db.cards).insert(
-          CardsCompanion.insert(
-            kind: const drift.Value('word'),
-            prompt: 'spaced repetition',
-            answer: '间隔重复',
-            lang: const drift.Value('en'),
-            dueAt: now,
-            createdAt: now,
-          ),
-        );
     final itemId = await db.into(db.items).insert(
           ItemsCompanion.insert(
             source: const drift.Value('browser'),
             originalUrl: const drift.Value('https://example.com/article'),
             sourceTitle: const drift.Value('间隔重复指南'),
+            note: const drift.Value('spaced repetition'),
             lang: const drift.Value('en'),
-            status: const drift.Value('learning'),
+            status: const drift.Value('inbox'),
             createdAt: now,
           ),
         );
@@ -163,7 +130,6 @@ void main() {
 
     // 恢复：sourceTitle 原样回到本地
     await db.delete(db.items).go();
-    await db.delete(db.cards).go();
     expect(await svc.restore(), isNull);
     final merged = await (db.select(db.items)
           ..where((t) => t.id.equals(itemId)))
@@ -171,7 +137,8 @@ void main() {
     expect(merged.originalUrl, 'https://example.com/article');
     expect(merged.sourceTitle, '间隔重复指南');
 
-    // 旧快照（无 sourceTitle 字段）合并不报错、字段为 null
+    // 旧快照（无 sourceTitle 字段）合并不报错、字段为 null；
+    // 旧 items 行里的 cardId 等已删字段被忽略
     final legacy = SyncSnapshot.decode(
       '{"app":"shiyi","rows":{"collections":[],'
       '"cards":[],"items":[{"id":9901,"cardId":null,"source":"manual",'
@@ -197,8 +164,11 @@ void main() {
 
     final decoded = SyncSnapshot.decode(text);
     expect(decoded.payload['app'], 'shiyi');
+    expect(decoded.rows['items'], isA<List>());
+    expect((decoded.rows['items'] as List).length, 1);
+    // Glean 无卡片/复习日志表：快照中这两段恒为空列表（兼容旧契约）
+    expect(decoded.rows['cards'], isA<List>());
     expect(decoded.rows['review_logs'], isA<List>());
-    expect((decoded.rows['cards'] as List).length, 1);
   });
 
   test('多端合并：两端各自新增互不丢失', () async {
@@ -206,7 +176,7 @@ void main() {
     addTearDown(() => backupDir.delete(recursive: true));
     final drive = LocalDrive(backupDir);
 
-    // 端 A：有 1 张卡，首次同步（推送）
+    // 端 A：有 1 条收藏，首次同步（推送）
     final dbA = db;
     final svcA = SyncService(db: dbA, cloud: drive);
     await seed();
@@ -220,10 +190,9 @@ void main() {
 
     // B 新增一条收藏
     final now = DateTime(2026, 9, 2, 10);
-    await ItemRepository(dbB).createManualCard(
-      prompt: 'あたらしい',
-      answer: '新的',
-      kind: 'word',
+    await ItemRepository(dbB).createItem(
+      note: 'あたらしい',
+      source: 'manual',
       lang: 'ja',
       now: now,
     );
@@ -231,9 +200,9 @@ void main() {
 
     // 端 A：再次同步 → B 的新收藏合并进 A，A 原有数据保留
     await svcA.syncNow();
-    final aCount = (await dbA.select(dbA.cards).get()).length;
-    final bCount = (await dbB.select(dbB.cards).get()).length;
+    final aCount = (await dbA.select(dbA.items).get()).length;
+    final bCount = (await dbB.select(dbB.items).get()).length;
     expect(aCount, bCount);
-    expect(aCount, greaterThanOrEqualTo(2)); // A 1 张 + B 1 张 = 2
+    expect(aCount, greaterThanOrEqualTo(2)); // A 1 条 + B 1 条 = 2
   });
 }

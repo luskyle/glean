@@ -24,8 +24,6 @@ class DesktopSidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final collections = ref.watch(collectionsProvider);
-    final overview = ref.watch(reviewOverviewProvider);
-    final due = overview.maybeWhen(data: (o) => o.due, orElse: () => 0);
 
     return Material(
       color: scheme.surface,
@@ -41,7 +39,7 @@ class DesktopSidebar extends ConsumerWidget {
                 child: Row(
                   children: [
                     Text(
-                      '拾忆',
+                      'Glean',
                       style: Theme.of(context)
                           .textTheme
                           .displayMedium
@@ -66,29 +64,16 @@ class DesktopSidebar extends ConsumerWidget {
               _SidebarGroup(
                 children: [
                   _SidebarRow(
-                    icon: Icons.school,
-                    label: '今日复习',
-                    badge: due,
+                    icon: Icons.inbox_outlined,
+                    label: '收件箱',
                     selected: activeTab == 0,
                     onTap: () => onSelectTab(0),
                   ),
                   _SidebarRow(
-                    icon: Icons.translate,
-                    label: '学习',
-                    selected: activeTab == 2,
-                    onTap: () => onSelectTab(2),
-                  ),
-                  _SidebarRow(
                     icon: Icons.photo_library_outlined,
                     label: '素材库',
-                    selected: activeTab == 3,
-                    onTap: () => onSelectTab(3),
-                  ),
-                  _SidebarRow(
-                    icon: Icons.workspaces_outline,
-                    label: '记忆管理',
-                    selected: activeTab == 4,
-                    onTap: () => onSelectTab(4),
+                    selected: activeTab == 1,
+                    onTap: () => onSelectTab(1),
                   ),
                 ],
               ),
@@ -141,7 +126,7 @@ class DesktopSidebar extends ConsumerWidget {
                             child: _SidebarRow(
                               icon: Icons.folder,
                               label: c.name,
-                              selected: activeTab == 1 &&
+                              selected: activeTab == 0 &&
                                   ref
                                           .watch(libraryFilterProvider)
                                           .collectionId ==
@@ -226,7 +211,6 @@ class DesktopSidebar extends ConsumerWidget {
     if (ok == true) {
       await ref.read(itemRepositoryProvider).deleteCollection(c.id);
       ref.invalidate(collectionsProvider);
-      ref.invalidate(collectionStatsProvider);
       // 分类即时同步到云端
       ref.read(syncServiceProvider).syncNow().ignore();
     }
@@ -235,7 +219,7 @@ class DesktopSidebar extends ConsumerWidget {
   void _openCollection(WidgetRef ref, CollectionRow c) {
     ref.read(libraryFilterProvider.notifier).state =
         ref.read(libraryFilterProvider).withCollection(c.id);
-    onSelectTab(1);
+    onSelectTab(0);
   }
 
   void _openAddSheet(BuildContext context) {
@@ -279,20 +263,18 @@ class _SidebarGroup extends StatelessWidget {
   }
 }
 
-/// 导航行：系统图标 + 标签 + 徽标；选中态：蓝色文字 + 圆角高亮。
+/// 导航行：系统图标 + 标签；选中态：蓝色文字 + 圆角高亮。
 class _SidebarRow extends StatelessWidget {
   const _SidebarRow({
     required this.icon,
     required this.label,
     required this.onTap,
     this.selected = false,
-    this.badge = 0,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
-  final int badge;
   final VoidCallback onTap;
 
   @override
@@ -324,15 +306,6 @@ class _SidebarRow extends StatelessWidget {
                   ),
                 ),
               ),
-              if (badge > 0)
-                Text(
-                  '$badge',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
             ],
           ),
         ),

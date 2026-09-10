@@ -1,452 +1,184 @@
 import 'package:drift/drift.dart';
 
 import '../database/database.dart';
-import '../dictionary/dictionary_service.dart';
-import '../../domain/srs/sm2.dart';
 import '../../domain/tagging/language.dart';
 
 /// 默认「未分类」分组名（列表排序时恒置底）。
 const kUncategorizedName = '未分类';
 
-/// 收藏条目 + 关联卡片（join 视图）。
-class ItemWithCard {
-  const ItemWithCard({required this.item, this.card});
-
-  final ItemRow item;
-  final CardRow? card;
-
-  bool get hasCard => card != null;
-}
-
-/// 卡片 + 所属收藏条目（join 视图）。
-class CardWithItem {
-  const CardWithItem({required this.card, required this.item});
-
-  final CardRow card;
-  final ItemRow item;
-}
-
-/// 收藏域仓储：收藏管道 → 成卡 → 记忆库查询。
+/// 收藏域仓储（Glean 收藏助手）：收件箱 → 整理 → 素材库/分组/标签。
+///
+/// 数据模型：收藏条目（items）为一等公民，分类（collections）/标签
+/// （item_tags）/素材（media_assets）均为其附注；无卡片/SRS 概念。
 class ItemRepository {
-  ItemRepository(this.db, {DictionaryService? dictionary})
-      : _dictionary = dictionary ?? DictionaryService();
+  ItemRepository(this.db);
 
   final AppDatabase db;
-  final DictionaryService _dictionary;
 
-  /// 词库批量导入 words 表（幂等：按 headword+reading 去重；层级纠错）。
-  Future<void> importDictionaryEntries(List<DictionaryEntry> entries) async {
-    final existing = await db.select(db.words).get();
-    final byKey = {
-      for (final w in existing) '${w.headword}|${w.reading}': w,
-    };
+  // ---------------------------------------------------------------------------
+  // 收藏条目
+  // ---------------------------------------------------------------------------
 
-    final batch = <WordsCompanion>[];
-    final fixes = <WordsCompanion>[];
-    for (final e in entries) {
-      final key = '${e.headword}|${e.reading}';
-      final current = byKey[key];
-      if (current == null) {
-        batch.add(
-          WordsCompanion.insert(
-            lang: e.lang,
-            headword: e.headword,
-            reading: Value(e.reading),
-            level: Value(e.level),
-          ),
-        );
-      } else if (current.level != e.level) {
-        // 旧版本把 A1/入门 误标为 NA1/N入门：纠错
-        fixes.add(
-          WordsCompanion(
-            id: Value(current.id),
-            level: Value(e.level),
-          ),
-        );
-      }
-    }
-    if (batch.isNotEmpty) {
-      await db.batch((b) => b.insertAll(db.words, batch));
-    }
-    for (final fix in fixes) {
-      await (db.update(db.words)..where((t) => t.id.equals(fix.id.value)))
-          .write(WordsCompanion(level: Value(fix.level.value)));
-    }
-  }
-
-  /// 指定语言中尚未学习（未成卡）的词条（主动学习数据源，可按关卡过滤）。
-  Future<List<WordRow>> unstudiedWords({
-    required String lang,
-    String? level,
-    int limit = 20,
-  }) async {
-    final used = await (db.selectOnly(db.cards)
-          ..addColumns([db.cards.wordId])
-          ..where(db.cards.wordId.isNotNull()))
-        .get();
-    final usedIds =
-        used.map((r) => r.read(db.cards.wordId)).whereType<int>().toSet();
-
-    final query = db.select(db.words);
-    if (level != null) {
-      query.where((t) => t.lang.equals(lang) & t.level.equals(level));
-    } else {
-      query.where((t) => t.lang.equals(lang));
-    }
-    final words = await query.get();
-    return words.where((w) => !usedIds.contains(w.id)).take(limit).toList();
-  }
-
-  /// 各关卡已学（已成卡）词数：lang + level → count（渐进解锁进度）。
-  Future<Map<String, int>> learnedCountByLevel(String lang) async {
-    final rows = await (db.select(db.words).join([
-      innerJoin(db.cards, db.cards.wordId.equalsExp(db.words.id)),
-    ])
-          ..where(db.words.lang.equals(lang) & db.cards.wordId.isNotNull()))
-        .get();
-    final counts = <String, int>{};
-    for (final r in rows) {
-      final level = r.readTable(db.words).level ?? '默认';
-      counts[level] = (counts[level] ?? 0) + 1;
-    }
-    return counts;
-  }
-
-  /// 某关卡总词数（词库元数据）。
-  Future<int> levelWordCount(String lang, String level) async {
-    final row = await (db.selectOnly(db.words)
-          ..addColumns([countAll()])
-          ..where(db.words.lang.equals(lang) & db.words.level.equals(level)))
-        .getSingle();
-    return row.read(countAll()) ?? 0;
-  }
-
-  /// 通过「学习」产生的卡片数（按语言统计，默认页学习情况展示）。
-  Future<Map<String, int>> learnedCountByLang() async {
-    final rows = await (db.select(db.items).join([
-      innerJoin(db.cards, db.cards.id.equalsExp(db.items.cardId)),
-    ])
-          ..where(
-              db.items.source.equals('study') & db.items.cardId.isNotNull()))
-        .get();
-    final counts = <String, int>{};
-    for (final r in rows) {
-      final lang = r.readTable(db.cards).lang ?? 'other';
-      counts[lang] = (counts[lang] ?? 0) + 1;
-    }
-    return counts;
-  }
-
-  /// 旧数据对账：取消收件箱后，遗留 inbox 条目升级为学习卡（无孤儿）。
-  /// - 已有卡 → 状态改 learning（正常进复习）
-  /// - 无卡（旧剪贴板待归类）→ 用备注文本自动成卡
-  Future<void> upgradeLegacyInbox({DateTime? now}) async {
-    final ts = now ?? DateTime.now();
-    final inbox = await (db.select(db.items)
-          ..where((t) => t.status.equals('inbox')))
-        .get();
-    for (final it in inbox) {
-      if (it.cardId != null) {
-        await (db.update(db.items)..where((t) => t.id.equals(it.id)))
-            .write(const ItemsCompanion(status: Value('learning')));
-        continue;
-      }
-      final text = it.note ?? '';
-      if (text.trim().isEmpty) continue;
-      final lang = it.lang ?? 'other';
-      final kind = text.trim().length > 20 ? 'idea' : 'word';
-      final cardId = await db.into(db.cards).insert(
-            CardsCompanion.insert(
-              kind: Value(kind),
-              prompt: text.trim(),
-              answer: '（待补充答案）',
-              lang: Value(lang),
-              dueAt: firstReviewDueAt(ts),
-              createdAt: it.createdAt,
-            ),
-          );
-      await (db.update(db.items)..where((t) => t.id.equals(it.id)))
-          .write(ItemsCompanion(
-        cardId: Value(cardId),
-        status: const Value('learning'),
-        note: const Value(null),
-        lang: Value(lang),
-      ));
-    }
-  }
-
-  /// 全部卡片数（免费额度上限判定用）。
-  Future<int> cardCount() async {
-    final query = db.selectOnly(db.items)
-      ..addColumns([countAll()])
-      ..where(db.items.cardId.isNotNull());
-    final row = await query.getSingle();
-    return row.read(countAll()) ?? 0;
-  }
-
-  /// 手录/主动学习创建：成卡 + 条目（status=learning，首次复习排期明天）。
-  /// 词条类命中离线词库 → 自动补释义/读音并关联 word 行（官方词库路径）；
-  /// [wordId] 显式传入时直接关联（主动学习从词库取词的路径）。
-  Future<int> createManualCard({
-    required String prompt,
-    required String answer,
-    required String kind,
-    required String lang,
-    List<String> tags = const [],
-    String? note,
-    String source = 'manual',
+  /// 收藏库流（新在前），支持搜索/语言/状态/分组过滤。
+  Stream<List<ItemRow>> watchLibrary({
+    String search = '',
+    String? lang,
+    String? status,
     int? collectionId,
-    int? wordId,
+  }) {
+    final q = db.select(db.items)
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]);
+
+    if (search.trim().isNotEmpty) {
+      final like = '%${search.trim()}%';
+      // 命中标签 → 条目也算搜索匹配（多对多用子查询避免行重复）
+      final tagQuery = db.selectOnly(db.itemTags)
+        ..addColumns([db.itemTags.itemId])
+        ..where(db.itemTags.tag.like(like));
+      q.where((t) =>
+          t.note.like(like) |
+          t.sourceTitle.like(like) |
+          t.originalUrl.like(like) |
+          t.id.isInQuery(tagQuery));
+    }
+    if (lang != null && lang.isNotEmpty) {
+      q.where((t) => t.lang.equals(lang));
+    }
+    if (status != null && status.isNotEmpty) {
+      q.where((t) => t.status.equals(status));
+    }
+    if (collectionId != null) {
+      final memberQuery = db.selectOnly(db.itemCollections)
+        ..addColumns([db.itemCollections.itemId])
+        ..where(db.itemCollections.collectionId.equals(collectionId));
+      q.where((t) => t.id.isInQuery(memberQuery));
+    }
+    return q.watch();
+  }
+
+  /// 收藏列表查询（一次性，非流）。
+  Future<List<ItemRow>> items({
+    String search = '',
+    String? lang,
+    String? status,
+    int? collectionId,
+    int limit = 500,
+  }) async {
+    final q = db.select(db.items)
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+      ..limit(limit);
+
+    if (search.trim().isNotEmpty) {
+      final like = '%${search.trim()}%';
+      final tagQuery = db.selectOnly(db.itemTags)
+        ..addColumns([db.itemTags.itemId])
+        ..where(db.itemTags.tag.like(like));
+      q.where((t) =>
+          t.note.like(like) |
+          t.sourceTitle.like(like) |
+          t.originalUrl.like(like) |
+          t.id.isInQuery(tagQuery));
+    }
+    if (lang != null && lang.isNotEmpty) {
+      q.where((t) => t.lang.equals(lang));
+    }
+    if (status != null && status.isNotEmpty) {
+      q.where((t) => t.status.equals(status));
+    }
+    if (collectionId != null) {
+      final memberQuery = db.selectOnly(db.itemCollections)
+        ..addColumns([db.itemCollections.itemId])
+        ..where(db.itemCollections.collectionId.equals(collectionId));
+      q.where((t) => t.id.isInQuery(memberQuery));
+    }
+    return q.get();
+  }
+
+  /// 收藏条目（按 id）。
+  Future<ItemRow> item(int id) async {
+    return (db.select(db.items)..where((t) => t.id.equals(id))).getSingle();
+  }
+
+  /// 创建收藏：
+  /// - [note] 为收藏内容（主内容）
+  /// - 语言未指定时按内容自动检测
+  /// - 默认进入收件箱（status='inbox'，待整理）
+  /// - 可选：分类（自动设为主分类）、标签、素材、出处
+  Future<ItemRow> createItem({
+    required String note,
+    String source = 'manual',
+    String? lang,
     int? mediaAssetId,
+    String? originalUrl,
+    String? sourceTitle,
+    String? mediaPath,
+    String status = 'inbox',
+    List<String> tags = const [],
+    int? collectionId,
     DateTime? now,
   }) async {
     final ts = now ?? DateTime.now();
-
-    // 词条类：先查离线词库，命中则建 word 行并关联（本地优先原则）
-    if (kind == 'word' && wordId == null) {
-      final hits = _dictionary.lookup(prompt);
-      final hit = hits.isNotEmpty ? hits.first : null;
-      if (hit != null) {
-        wordId = await db.into(db.words).insert(
-              WordsCompanion.insert(
-                lang: hit.lang,
-                headword: hit.headword,
-                reading: Value(hit.reading),
-                level: Value(hit.level),
-              ),
-            );
-      }
-    }
-
-    final cardId = await db.into(db.cards).insert(
-          CardsCompanion.insert(
-            kind: Value(kind),
-            prompt: prompt,
-            answer: answer,
-            wordId: Value(wordId),
-            lang: Value(lang),
-            tags: tags.isEmpty ? const Value(null) : Value(tags.join(',')),
-            dueAt: firstReviewDueAt(ts),
-            createdAt: ts,
-          ),
-        );
+    final resolvedLang = lang ??
+        (note.trim().isEmpty ? null : langCodeOf(detectLang(note)));
 
     final itemId = await db.into(db.items).insert(
           ItemsCompanion.insert(
-            cardId: Value(cardId),
             source: Value(source),
             note: Value(note),
-            lang: Value(lang),
-            status: const Value('learning'),
+            lang: Value(resolvedLang),
+            status: Value(status),
             mediaAssetId: Value(mediaAssetId),
+            originalUrl: Value(originalUrl),
+            sourceTitle: Value(sourceTitle),
+            mediaPath: Value(mediaPath),
             createdAt: ts,
           ),
         );
 
     await _linkTags(itemId, tags);
     if (collectionId != null) {
-      await _linkCollection(itemId, collectionId);
+      await setPrimaryCollection(itemId, collectionId);
     }
-    return itemId;
+    return (db.select(db.items)..where((t) => t.id.equals(itemId)))
+        .getSingle();
   }
 
-  /// 收藏入口（剪贴板/分享等）：仅建条目，未成卡（status=inbox，待整理）。
-  Future<int> createInboxItem({
-    required String text,
-    String source = 'clipboard',
+  /// 更新收藏条目字段（只写传入的字段）。
+  Future<void> updateItem(
+    int id, {
     String? note,
-    DateTime? now,
-  }) async {
-    final ts = now ?? DateTime.now();
-    final lang = langCodeOf(detectLang(text));
-    return db.into(db.items).insert(
-          ItemsCompanion.insert(
-            source: Value(source),
-            note: Value(note ?? text),
-            lang: Value(lang),
-            status: const Value('inbox'),
-            createdAt: ts,
-          ),
-        );
-  }
-
-  /// 收件箱条目 → 成卡（一键整理）。低置信（未命中词库/AI）标"待确认"标签。
-  Future<int> confirmInboxToCard({
-    required int itemId,
-    required String answer,
-    String? promptOverride,
-    String? kind,
-    List<String> tags = const [],
-    int? collectionId,
-    DateTime? now,
-  }) async {
-    final ts = now ?? DateTime.now();
-    final item = await (db.select(db.items)..where((t) => t.id.equals(itemId)))
-        .getSingleOrNull();
-    if (item == null) throw StateError('item not found: $itemId');
-
-    final prompt = promptOverride ?? item.note ?? item.id.toString();
-    final cardKind = kind ?? 'word';
-
-    int? wordId;
-    final dictionaryHit = _dictionary.lookup(prompt).isNotEmpty;
-    if (cardKind == 'word' && dictionaryHit) {
-      final hit = _dictionary.lookup(prompt).first;
-      wordId = await db.into(db.words).insert(
-            WordsCompanion.insert(
-              lang: hit.lang,
-              headword: hit.headword,
-              reading: Value(hit.reading),
-              level: Value(hit.level),
-            ),
-          );
-    }
-
-    final cardId = await db.into(db.cards).insert(
-          CardsCompanion.insert(
-            kind: Value(cardKind),
-            prompt: prompt,
-            answer: answer,
-            wordId: Value(wordId),
-            lang: Value(item.lang),
-            tags: Value(tags.join(',')),
-            dueAt: firstReviewDueAt(ts),
-            createdAt: ts,
-          ),
-        );
-
-    final resolvedTags = [
-      ...tags,
-      if (cardKind == 'word' && !dictionaryHit) '待确认',
-    ];
-
-    await (db.update(db.items)..where((t) => t.id.equals(itemId))).write(
-      ItemsCompanion(
-        cardId: Value(cardId),
-        status: const Value('learning'),
-        note: const Value(null),
-      ),
-    );
-    await _linkTags(itemId, resolvedTags);
-    if (collectionId != null) {
-      await _linkCollection(itemId, collectionId);
-    }
-    return cardId;
-  }
-
-  /// 收件箱流：待归类(inbox) + 待学习(learning)，收藏时间倒序。
-  Stream<List<ItemWithCard>> watchInbox() {
-    final q = db.select(db.items).join([
-      leftOuterJoin(db.cards, db.cards.id.equalsExp(db.items.cardId)),
-    ])
-      ..where(db.items.status.isIn(['inbox', 'learning']))
-      ..orderBy([OrderingTerm.desc(db.items.createdAt)])
-      ..limit(500);
-    return q.watch().map(_mapItemWithCard);
-  }
-
-  List<ItemWithCard> _mapItemWithCard(List<TypedResult> rows) {
-    return rows
-        .map((r) => ItemWithCard(
-              item: r.readTable(db.items),
-              card: r.readTableOrNull(db.cards),
-            ))
-        .toList();
-  }
-
-  /// 记忆库流：全部成卡条目 + 可选搜索/筛选/按主库过滤。
-  Stream<List<ItemWithCard>> watchLibrary({
-    String search = '',
     String? lang,
     String? status,
-    int? collectionId,
-  }) {
-    final q = db.select(db.items).join([
-      leftOuterJoin(db.cards, db.cards.id.equalsExp(db.items.cardId)),
-      if (collectionId != null)
-        innerJoin(
-          db.itemCollections,
-          db.itemCollections.itemId.equalsExp(db.items.id),
-        ),
-    ])
-      ..where(db.items.cardId.isNotNull())
-      ..orderBy([OrderingTerm.desc(db.items.createdAt)]);
-
-    final where = q.where;
-    if (search.trim().isNotEmpty) {
-      final like = '%${search.trim()}%';
-      where(db.cards.prompt.like(like) |
-          db.cards.answer.like(like) |
-          db.cards.tags.like(like) |
-          db.items.note.like(like));
-    }
-    if (lang != null && lang.isNotEmpty) {
-      where(db.cards.lang.equals(lang));
-    }
-    if (status != null && status.isNotEmpty) {
-      where(db.items.status.equals(status));
-    }
-    if (collectionId != null) {
-      where(db.itemCollections.collectionId.equals(collectionId) &
-          db.itemCollections.isPrimary.equals(true));
-    }
-
-    return q.watch().map(_mapItemWithCard);
-  }
-
-  /// 删除条目与对应卡片（复习日志级联删除；打墓碑防同步复活）。
-  Future<void> deleteItem(int itemId) async {
-    final item = await (db.select(db.items)..where((t) => t.id.equals(itemId)))
-        .getSingleOrNull();
-    await recordDeletion('items', itemId);
-    if (item?.cardId != null) {
-      await recordDeletion('cards', item!.cardId!);
-    }
-    await (db.delete(db.items)..where((t) => t.id.equals(itemId))).go();
-    if (item?.cardId != null) {
-      await (db.delete(db.cards)..where((t) => t.id.equals(item!.cardId!)))
-          .go();
-    }
-  }
-
-  /// 记录删除墓碑（防止同步 pull 时复活）。
-  Future<void> recordDeletion(String tableName, int entityId) {
-    return db.into(db.syncDeletions).insert(
-          SyncDeletionsCompanion.insert(
-            entityTable: tableName,
-            entityId: entityId,
-            deletedAt: DateTime.now(),
-          ),
-          mode: InsertMode.insertOrIgnore,
-        );
-  }
-
-  /// 全部墓碑键（merge 过滤用）：`table|id` 集合。
-  Future<Set<String>> deletionKeys() async {
-    final rows = await db.select(db.syncDeletions).get();
-    return rows.map((r) => '${r.entityTable}|${r.entityId}').toSet();
-  }
-
-  /// 编辑卡面字段。
-  Future<void> updateCardFields(
-    int itemId, {
-    String? prompt,
-    String? answer,
-    List<String>? tags,
+    String? source,
+    int? mediaAssetId,
+    String? originalUrl,
+    String? sourceTitle,
   }) async {
-    final item = await (db.select(db.items)..where((t) => t.id.equals(itemId)))
-        .getSingleOrNull();
-    if (item?.cardId == null) return;
-    await (db.update(db.cards)..where((t) => t.id.equals(item!.cardId!))).write(
-      CardsCompanion(
-        prompt: prompt == null ? const Value.absent() : Value(prompt),
-        answer: answer == null ? const Value.absent() : Value(answer),
-        tags: tags == null ? const Value.absent() : Value(tags.join(',')),
+    await (db.update(db.items)..where((t) => t.id.equals(id))).write(
+      ItemsCompanion(
+        note: note == null ? const Value.absent() : Value(note),
+        lang: lang == null ? const Value.absent() : Value(lang),
+        status: status == null ? const Value.absent() : Value(status),
+        source: source == null ? const Value.absent() : Value(source),
+        mediaAssetId:
+            mediaAssetId == null ? const Value.absent() : Value(mediaAssetId),
+        originalUrl:
+            originalUrl == null ? const Value.absent() : Value(originalUrl),
+        sourceTitle:
+            sourceTitle == null ? const Value.absent() : Value(sourceTitle),
       ),
     );
   }
 
-  // ---- 标签 ----
+  /// 删除条目（打墓碑防同步复活；分类/标签级联删除）。
+  Future<void> deleteItem(int itemId) async {
+    await recordDeletion('items', itemId);
+    await (db.delete(db.items)..where((t) => t.id.equals(itemId))).go();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 标签（ItemTags）
+  // ---------------------------------------------------------------------------
 
   Future<void> _linkTags(int itemId, List<String> tags) async {
     for (final tag in tags.where((t) => t.trim().isNotEmpty)) {
@@ -457,7 +189,23 @@ class ItemRepository {
     }
   }
 
-  // ---- 分组（库）----
+  /// 覆盖条目标签（整组替换）。
+  Future<void> setItemTags(int itemId, List<String> tags) async {
+    await (db.delete(db.itemTags)..where((t) => t.itemId.equals(itemId))).go();
+    await _linkTags(itemId, tags);
+  }
+
+  /// 条目标签列表。
+  Future<List<String>> tagsOfItem(int itemId) async {
+    final rows =
+        await (db.select(db.itemTags)..where((t) => t.itemId.equals(itemId)))
+            .get();
+    return rows.map((r) => r.tag).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 分类 / 分组（Collections）
+  // ---------------------------------------------------------------------------
 
   /// 分类列表（「未分类」恒置底，其余按 id 即创建顺序）。
   Future<List<CollectionRow>> collections() async {
@@ -478,7 +226,7 @@ class ItemRepository {
         );
   }
 
-  Future<void> renameCollection(int id, String name) =>
+  Future<void> updateCollection(int id, String name) =>
       (db.update(db.collections)..where((t) => t.id.equals(id)))
           .write(CollectionsCompanion(name: Value(name)));
 
@@ -490,18 +238,10 @@ class ItemRepository {
     await (db.delete(db.collections)..where((t) => t.id.equals(id))).go();
   }
 
-  Future<void> _linkCollection(int itemId, int collectionId) {
-    return db.into(db.itemCollections).insert(
-          ItemCollectionsCompanion.insert(
-            itemId: itemId,
-            collectionId: collectionId,
-            isPrimary: const Value(true),
-          ),
-          mode: InsertMode.insertOrIgnore,
-        );
-  }
+  /// 确保系统分类存在（工作/学习/未分类；幂等；不可删）。
+  Future<void> ensureSystemCollections() => db.ensureDefaultCollections();
 
-  /// 条目所属的库（详情页展示用）。
+  /// 条目所属的分类（详情展示用）。
   Future<List<CollectionRow>> collectionsOfItem(int itemId) async {
     final rows = await (db.select(db.itemCollections).join([
       innerJoin(db.collections,
@@ -512,24 +252,84 @@ class ItemRepository {
     return rows.map((r) => r.readTable(db.collections)).toList();
   }
 
-  /// 库统计：卡片数 + 已掌握数（记忆库分组头部数据条）。
-  Future<Map<int, ({int total, int mastered})>> collectionStats() async {
-    final items =
-        await (db.select(db.items)..where((t) => t.cardId.isNotNull())).get();
-    final links = await db.select(db.itemCollections).get();
+  /// 条目的主分类 id（null = 未分类）。
+  Future<int?> primaryCollectionOfItem(int itemId) async {
+    final row = await (db.select(db.itemCollections)
+          ..where((t) => t.itemId.equals(itemId) & t.isPrimary.equals(true)))
+        .getSingleOrNull();
+    return row?.collectionId;
+  }
 
-    final stats = <int, ({int total, int mastered})>{};
-    final itemsById = {for (final i in items) i.id: i};
-    for (final link in links) {
-      final item = itemsById[link.itemId];
-      if (item == null) continue;
-      final entry =
-          stats.putIfAbsent(link.collectionId, () => (total: 0, mastered: 0));
-      stats[link.collectionId] = (
-        total: entry.total + 1,
-        mastered: entry.mastered + (item.status == 'mastered' ? 1 : 0),
-      );
+  /// 关联条目与分类（幂等）；[isPrimary] 时设为主分类。
+  Future<void> linkItemToCollection(
+    int itemId,
+    int collectionId, {
+    bool isPrimary = false,
+  }) async {
+    await db.into(db.itemCollections).insert(
+          ItemCollectionsCompanion.insert(
+            itemId: itemId,
+            collectionId: collectionId,
+            isPrimary: Value(isPrimary),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+    if (isPrimary) {
+      await _markPrimary(itemId, collectionId);
     }
-    return stats;
+  }
+
+  /// 取消条目与分类的关联。
+  Future<void> unlinkItemFromCollection(int itemId, int collectionId) async {
+    await (db.delete(db.itemCollections)
+          ..where((t) =>
+              t.itemId.equals(itemId) & t.collectionId.equals(collectionId)))
+        .go();
+  }
+
+  /// 设置主分类：清除其他主标记，[collectionId] 置为主分类。
+  /// 传入 null 则仅清除主标记（条目回到未分类视图）。
+  Future<void> setPrimaryCollection(int itemId, int? collectionId) async {
+    await (db.update(db.itemCollections)..where((t) => t.itemId.equals(itemId)))
+        .write(const ItemCollectionsCompanion(isPrimary: Value(false)));
+    if (collectionId == null) return;
+    await db.into(db.itemCollections).insert(
+          ItemCollectionsCompanion.insert(
+            itemId: itemId,
+            collectionId: collectionId,
+            isPrimary: const Value(false),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+    await _markPrimary(itemId, collectionId);
+  }
+
+  Future<void> _markPrimary(int itemId, int collectionId) async {
+    await (db.update(db.itemCollections)
+          ..where((t) =>
+              t.itemId.equals(itemId) & t.collectionId.equals(collectionId)))
+        .write(const ItemCollectionsCompanion(isPrimary: Value(true)));
+  }
+
+  // ---------------------------------------------------------------------------
+  // 同步墓碑
+  // ---------------------------------------------------------------------------
+
+  /// 记录删除墓碑（防止同步 pull 时复活）。
+  Future<void> recordDeletion(String tableName, int entityId) {
+    return db.into(db.syncDeletions).insert(
+          SyncDeletionsCompanion.insert(
+            entityTable: tableName,
+            entityId: entityId,
+            deletedAt: DateTime.now(),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+  }
+
+  /// 全部墓碑键（merge 过滤用）：`table|id` 集合。
+  Future<Set<String>> deletionKeys() async {
+    final rows = await db.select(db.syncDeletions).get();
+    return rows.map((r) => '${r.entityTable}|${r.entityId}').toSet();
   }
 }

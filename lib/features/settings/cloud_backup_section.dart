@@ -76,9 +76,7 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
           await ref.read(settingsProvider).markBackupNow();
         }
         // 同步/恢复都刷新页面数据（拉取的内容立刻可见）
-          ref.invalidate(libraryItemsProvider);
-        ref.invalidate(reviewOverviewProvider);
-        ref.invalidate(quotaProvider);
+        ref.invalidate(libraryItemsProvider);
         ref.invalidate(collectionsProvider);
         final msg = switch (action) {
           'sync' => '同步完成',
@@ -130,7 +128,7 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
             ),
             const SizedBox(height: 6),
             Text(
-              '数据只同步文本元数据与复习日志，媒体永不进入服务器',
+              '数据只同步文本元数据（收藏/分组/标签），媒体永不进入服务器',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),

@@ -2,109 +2,146 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../data/analytics/analytics_service.dart';
 import '../../core/theme.dart';
 import '../../data/database/database.dart';
-import '../../data/repositories/item_repository.dart';
 import '../../providers.dart';
 import '../../shared/status_chip.dart';
 import '../library/media_library_screen.dart';
 
-/// 条目详情与操作（收件箱 / 记忆库共用）：
-/// - 已成卡：查看/编辑卡面、删除
-/// - 待归类：一键成卡（离线词库命中自动补释义，低置信标"待确认"）
+/// 收藏条目详情与操作（收件箱 / 收藏库共用）：
+/// 查看 / 编辑内容、语言、状态、分组、标签；删除。
 class ItemActions {
-  static void open(BuildContext context, WidgetRef ref, ItemWithCard item) {
-    if (item.hasCard) {
-      _showCardSheet(context, ref, item);
-    } else {
-      _showConfirmSheet(context, ref, item);
-    }
-  }
-
-  // ---- 已成卡：详情 / 编辑 / 删除 ----
-
-  static void _showCardSheet(
-      BuildContext context, WidgetRef ref, ItemWithCard item) {
-    final card = item.card!;
+  static void open(BuildContext context, WidgetRef ref, ItemRow item) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _CardDetailSheet(item: item, card: card),
-    );
-  }
-
-  // ---- 待归类：一键成卡 ----
-
-  static void _showConfirmSheet(
-      BuildContext context, WidgetRef ref, ItemWithCard item) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _ConfirmCardSheet(item: item),
+      builder: (_) => ItemDetailSheet(item: item),
     );
   }
 }
 
-class _CardDetailSheet extends ConsumerStatefulWidget {
-  const _CardDetailSheet({required this.item, required this.card});
+class ItemDetailSheet extends ConsumerStatefulWidget {
+  const ItemDetailSheet({super.key, required this.item});
 
-  final ItemWithCard item;
-  final CardRow card;
+  final ItemRow item;
 
   @override
-  ConsumerState<_CardDetailSheet> createState() => _CardDetailSheetState();
+  ConsumerState<ItemDetailSheet> createState() => _ItemDetailSheetState();
 }
 
-class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
-  late final TextEditingController _prompt;
-  late final TextEditingController _answer;
+class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
+  late final TextEditingController _note;
+  final _tagCtrl = TextEditingController();
+
+  String? _lang; // null = 自动（保持原样越界时按条目原值）
+  late String _status;
+  final Set<String> _tags = {};
+  bool _saving = false;
+
+  static const _knownLangs = {'zh', 'ja', 'en', 'other'};
 
   @override
   void initState() {
     super.initState();
-    _prompt = TextEditingController(text: widget.card.prompt);
-    _answer = TextEditingController(text: widget.card.answer);
+    _note = TextEditingController(text: widget.item.note ?? '');
+    final raw = widget.item.lang;
+    _lang = (_knownLangs.contains(raw) && raw != null) ? raw : null;
+    _status = widget.item.status;
+    _loadTags();
+  }
+
+  Future<void> _loadTags() async {
+    final tags =
+        await ref.read(itemRepositoryProvider).tagsOfItem(widget.item.id);
+    if (mounted) setState(() => _tags.addAll(tags));
   }
 
   @override
   void dispose() {
-    _prompt.dispose();
-    _answer.dispose();
+    _note.dispose();
+    _tagCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    await ref.read(itemRepositoryProvider).updateCardFields(
-          widget.item.item.id,
-          prompt: _prompt.text.trim(),
-          answer: _answer.text.trim(),
-        );
+    final content = _note.text.trim();
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('内容不能为空')));
+      return;
+    }
+    setState(() => _saving = true);
+    final repo = ref.read(itemRepositoryProvider);
+    await repo.updateItem(
+      widget.item.id,
+      note: content,
+      lang: _lang,
+      status: _status,
+    );
+    await repo.setItemTags(widget.item.id, _tags.toList());
+    ref.invalidate(libraryItemsProvider);
+    // 编辑即同步（其他端同时收敛）
+    ref.read(syncServiceProvider).syncNow().ignore();
     if (mounted) {
       Navigator.of(context).pop();
-      ref.invalidate(libraryItemsProvider);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已保存')));
     }
   }
 
   Future<void> _delete() async {
-    await ref.read(itemRepositoryProvider).deleteItem(widget.item.item.id);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('删除这条收藏？'),
+        content: const Text('删除后可通过云盘备份恢复（若有）。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(itemRepositoryProvider).deleteItem(widget.item.id);
     // 删除即同步（墓碑防云端复活），其他端同时收敛
     ref.read(syncServiceProvider).syncNow().ignore();
+    ref.invalidate(libraryItemsProvider);
+    ref.invalidate(collectionsProvider);
     if (mounted) {
       Navigator.of(context).pop();
-      ref.invalidate(libraryItemsProvider);
-      ref.invalidate(reviewOverviewProvider);
-      ref.invalidate(quotaProvider);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('已删除')));
     }
   }
 
+  void _chooseCollection(int? collectionId) {
+    setState(() {});
+    ref
+        .read(itemRepositoryProvider)
+        .setPrimaryCollection(widget.item.id, collectionId);
+    ref.invalidate(libraryItemsProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final scheme = Theme.of(context).colorScheme;
+    final item = widget.item;
+
+    // 分组：当前主分类（来自关系流）
+    final links = ref.watch(itemCollectionLinksProvider).value ?? const [];
+    final primaryId = links
+        .where((l) => l.itemId == item.id && l.isPrimary)
+        .map((l) => l.collectionId)
+        .firstOrNull;
+    final collections = ref.watch(collectionsProvider).value ?? const [];
+
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: SingleChildScrollView(
@@ -115,58 +152,119 @@ class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
           children: [
             Row(
               children: [
-                Text('卡片', style: Theme.of(context).textTheme.titleLarge),
+                Text('收藏详情', style: Theme.of(context).textTheme.titleLarge),
                 const Spacer(),
-                StatusChip(status: widget.item.item.status),
+                StatusChip(status: _status),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              '间隔 ${widget.card.intervalDays} 天 · EF ${widget.card.easeFactor.toStringAsFixed(2)}',
+              '收藏于 ${_dateLabel(item.createdAt)} · 来源 ${_sourceLabel(item.source)}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             // 出处（Phase 1：浏览器划词收藏自动带来源页）
-            if (widget.item.item.originalUrl != null ||
-                widget.item.item.sourceTitle != null) ...[
+            if (item.originalUrl != null || item.sourceTitle != null) ...[
               const SizedBox(height: 12),
-              _SourceRow(item: widget.item.item),
+              _SourceRow(item: item),
             ],
-            // 本地素材（记忆教练：链接素材库，回忆锚点）
-            if (widget.item.item.mediaAssetId != null) ...[
+            // 本地素材（链接素材库，回忆锚点）
+            if (item.mediaAssetId != null) ...[
               const SizedBox(height: 12),
-              SourceMediaView(assetId: widget.item.item.mediaAssetId!),
+              SourceMediaView(assetId: item.mediaAssetId!),
             ],
             const SizedBox(height: 16),
             TextField(
-              controller: _prompt,
-              maxLines: 3,
+              controller: _note,
+              maxLines: 4,
               decoration: const InputDecoration(
-                labelText: '正面',
+                labelText: '内容',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _answer,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: '背面 / 答案',
-                border: OutlineInputBorder(),
-              ),
+            // 语言
+            DropdownButtonFormField<String?>(
+              initialValue: _lang,
+              decoration: const InputDecoration(labelText: '语言'),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('自动')),
+                DropdownMenuItem(value: 'zh', child: Text('中文')),
+                DropdownMenuItem(value: 'ja', child: Text('日语')),
+                DropdownMenuItem(value: 'en', child: Text('英语')),
+                DropdownMenuItem(value: 'other', child: Text('其他')),
+              ],
+              onChanged: (v) => setState(() => _lang = v),
             ),
+            const SizedBox(height: 12),
+            // 状态（收藏整理语义）
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final s in const ['inbox', 'active', 'archived'])
+                  ChoiceChip(
+                    label: Text(statusLabel(s)),
+                    selected: _status == s,
+                    onSelected: (_) => setState(() => _status = s),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 分组（主分类）
+            DropdownButtonFormField<int?>(
+              initialValue: primaryId,
+              decoration: const InputDecoration(labelText: '分组'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('未分类')),
+                for (final c in collections)
+                  DropdownMenuItem(value: c.id, child: Text(c.name)),
+              ],
+              onChanged: _chooseCollection,
+            ),
+            const SizedBox(height: 12),
+            // 标签
+            TextField(
+              controller: _tagCtrl,
+              decoration: const InputDecoration(
+                labelText: '标签',
+                hintText: '回车添加',
+              ),
+              onSubmitted: (t) {
+                final tag = t.trim();
+                if (tag.isNotEmpty) {
+                  setState(() => _tags.add(tag));
+                  _tagCtrl.clear();
+                }
+              },
+            ),
+            if (_tags.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Wrap(
+                  spacing: 6,
+                  children: _tags
+                      .map((t) => InputChip(
+                            label: Text('#$t'),
+                            onDeleted: () => setState(() => _tags.remove(t)),
+                          ))
+                      .toList(),
+                ),
+              ),
             const SizedBox(height: 20),
             Row(
               children: [
                 OutlinedButton.icon(
-                  onPressed: _delete,
+                  onPressed: _saving ? null : _delete,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: scheme.error,
                   ),
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('删除'),
                 ),
                 const Spacer(),
-                FilledButton(onPressed: _save, child: const Text('保存')),
+                FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: const Text('保存'),
+                ),
               ],
             ),
           ],
@@ -174,114 +272,22 @@ class _CardDetailSheetState extends ConsumerState<_CardDetailSheet> {
       ),
     );
   }
-}
 
-class _ConfirmCardSheet extends ConsumerStatefulWidget {
-  const _ConfirmCardSheet({required this.item});
+  String _dateLabel(DateTime dt) =>
+      '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
-  final ItemWithCard item;
-
-  @override
-  ConsumerState<_ConfirmCardSheet> createState() => _ConfirmCardSheetState();
-}
-
-class _ConfirmCardSheetState extends ConsumerState<_ConfirmCardSheet> {
-  late final TextEditingController _prompt;
-  final _answer = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _prompt = TextEditingController(
-      text: widget.item.item.note ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _prompt.dispose();
-    _answer.dispose();
-    super.dispose();
-  }
-
-  Future<void> _confirm() async {
-    final prompt = _prompt.text.trim();
-    if (prompt.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('内容不能为空')));
-      return;
-    }
-    await ref.read(itemRepositoryProvider).confirmInboxToCard(
-          itemId: widget.item.item.id,
-          promptOverride: prompt,
-          answer: _answer.text.trim().isEmpty ? '（待补充答案）' : _answer.text.trim(),
-          kind: widget.item.item.lang == 'ja' || widget.item.item.lang == 'en'
-              ? 'word'
-              : 'idea',
-        );
-    ref.read(analyticsProvider).track(
-      AnalyticsEvents.itemCardCreated,
-      props: {'source': widget.item.item.source},
-    );
-    if (mounted) {
-      Navigator.of(context).pop();
-      ref.invalidate(reviewOverviewProvider);
-      ref.invalidate(quotaProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已成卡，明天首次复习')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('待归类 → 成卡', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(
-              '确认后进入复习队列（明天首复），答案可随时编辑',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _prompt,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: '正面',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _answer,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: '背面 / 答案',
-                hintText: '可留空，稍后补充',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _confirm,
-                icon: const Icon(Icons.task_alt),
-                label: const Text('成卡并入复习'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _sourceLabel(String? source) {
+    return switch (source) {
+      'clipboard' => '剪贴板',
+      'browser' => '浏览器',
+      'share' => '分享',
+      'photo' => '照片',
+      'manual' => '手动',
+      'word' => '词条',
+      'quote' => '语录',
+      'idea' => '灵感',
+      _ => source ?? '未知',
+    };
   }
 }
 
