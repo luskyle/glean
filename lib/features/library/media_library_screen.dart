@@ -231,8 +231,8 @@ class _FolderContent extends StatelessWidget {
   }
 }
 
-/// 底部目录 tab 条：横向滑动切换链接的目录；每项固定宽，
-/// 可见最多 5 个（超出部分左右滑动查看更多）。
+/// 底部目录切换器：居中胶囊（iOS 相机模式条风格）。
+/// 每项固定宽 = 屏宽 1/5（可见最多 5 个），目录更多时左右滑动查看。
 class _FolderTabBar extends StatelessWidget {
   const _FolderTabBar({
     required this.folders,
@@ -248,59 +248,78 @@ class _FolderTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final screenW = MediaQuery.sizeOf(context).width;
-    // 每项宽 = 屏宽 1/5（最多 5 个可见），窄屏兜底 84
-    final itemWidth = math.max(math.min(screenW / 5, 132.0), 84.0);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: 0.5),
+    final chipW = math.max(math.min(screenW / 5, 132.0), 84.0);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Row(
+              children: [
+                for (var i = 0; i < folders.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 4),
+                  _ModeChip(
+                    width: chipW,
+                    label: folders[i].name,
+                    selected: i == currentIndex,
+                    onTap: () => onSelect(i),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
-      child: SizedBox(
-        height: 56,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: folders.length,
-          itemBuilder: (_, i) {
-            final selected = i == currentIndex;
-            return InkWell(
-              onTap: () => onSelect(i),
-              child: SizedBox(
-                width: itemWidth,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: selected ? 28 : 0,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: AppTheme.systemBlue,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      folders[i].name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w400,
-                        color: selected
-                            ? AppTheme.systemBlue
-                            : scheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+    );
+  }
+}
+
+/// 胶囊内的单个模式项：选中项白色圆角块 + 主题色加粗文字。
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.width,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final double width;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: width,
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? scheme.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? AppTheme.systemBlue : scheme.onSurface,
+          ),
         ),
       ),
     );
@@ -329,7 +348,7 @@ class _FolderHeader extends ConsumerWidget {
                 Text(
                   folder.name,
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700),
+                      fontSize: 15, fontWeight: FontWeight.w600),
                 ),
                 if (folder.purpose != null && folder.purpose!.isNotEmpty)
                   Text(
@@ -715,7 +734,12 @@ class _AssetListTile extends StatelessWidget {
                 : Icon(Icons.videocam_outlined, color: scheme.onSurfaceVariant),
           ),
         ),
-        title: Text(asset.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          asset.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
         subtitle: Text(
           asset.purpose == null || asset.purpose!.isEmpty
               ? '图片 · 未填写用途${asset.type == 'video' ? '（视频）' : ''}'
