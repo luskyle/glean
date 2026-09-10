@@ -6,6 +6,7 @@ import '../../providers.dart';
 import '../../shared/empty_state.dart';
 import '../../shared/ios_large_title.dart';
 import '../settings/paywall_sheet.dart';
+import 'poetry_session_screen.dart';
 import 'study_level_screen.dart';
 
 /// 学习 Tab：按语言主动学习（新词闪卡 → 自动进入 SRS 复习队列）。
@@ -53,6 +54,50 @@ class StudyScreen extends ConsumerWidget {
               }
             },
           ),
+        const SizedBox(height: 20),
+        // 非语言玩法：古诗词填空
+        Text(
+          '经典诵读',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const PoetrySessionScreen(),
+              ),
+            ),
+            leading: Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.auto_stories, size: 20),
+            ),
+            title: const Text(
+              '古诗词',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text('随机一首古诗，在划线处补全字词。'),
+            trailing: Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       ],
     );
   }
