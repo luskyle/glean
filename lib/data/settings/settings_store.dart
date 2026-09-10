@@ -71,5 +71,5 @@ class Quota {
   const Quota._();
 
   static const int maxLibraryCards = 100;
-  static const int maxDailyReviews = 30;
+  static const int maxDailyReviews = 9999; // 已移除每日复习次数限制
 }

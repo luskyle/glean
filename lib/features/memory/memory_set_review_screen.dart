@@ -1,11 +1,8 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/analytics/analytics_service.dart';
 import '../../data/repositories/item_repository.dart';
-import '../../data/settings/settings_store.dart';
 import '../../domain/srs/sm2.dart';
 import '../../providers.dart';
 import '../review/flashcard.dart';
@@ -40,20 +37,11 @@ class _MemorySetReviewSessionScreenState
 
   Future<void> _load() async {
     final repo = ref.read(reviewRepositoryProvider);
-    final quota = await ref.read(quotaProvider.future);
     final cards = await repo.dueCards(memorySetId: widget.setId);
 
-    var allowed = cards.length;
-    if (!quota.isPro) {
-      final remaining = math.max(0, Quota.maxDailyReviews - quota.reviewsToday);
-      if (cards.length > remaining) {
-        allowed = remaining;
-      }
-    }
-
     setState(() {
-      _queue = cards.take(allowed).toList();
-      _finished = allowed == 0;
+      _queue = cards;
+      _finished = cards.isEmpty;
       _loading = false;
     });
   }

@@ -34,7 +34,7 @@ class SettingsScreen extends ConsumerWidget {
                     error: (_, __) => const Text('升级解锁无限额度'),
                     data: (q) => Text(q.isPro
                         ? '已解锁：无限复习 · 无限卡片'
-                        : '免费版：每日 30 次复习 · 卡片库 100 张'),
+                        : '免费版：无限复习 · 卡片库 100 张'),
                   ),
                   trailing: FilledButton.tonal(
                     onPressed: () => PaywallSheet.show(
@@ -54,7 +54,7 @@ class SettingsScreen extends ConsumerWidget {
                     data: (q) => Text(
                       q.isPro
                           ? '无限'
-                          : '今日已复习 ${q.reviewsToday}/${Quota.maxDailyReviews} 次 · '
+                          : '已复习 ${q.reviewsToday} 次 · '
                               '记忆库 ${q.libraryCards}/${Quota.maxLibraryCards} 张',
                     ),
                   ),

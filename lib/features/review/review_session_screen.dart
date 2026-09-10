@@ -1,14 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/analytics/analytics_service.dart';
 import '../../data/repositories/item_repository.dart';
-import '../../data/settings/settings_store.dart';
 import '../../domain/srs/sm2.dart';
 import '../../providers.dart';
-import '../settings/paywall_sheet.dart';
 import 'curve_screen.dart';
 import 'flashcard.dart';
 
@@ -29,7 +25,6 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
   int _index = 0;
   int _answered = 0;
   int _qualitySum = 0;
-  int _limitHit = 0; // 因免费额度被截断的卡片数
   bool _loading = true;
   bool _finished = false;
   bool _flipped = false;
@@ -42,23 +37,11 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
 
   Future<void> _load() async {
     final repo = ref.read(reviewRepositoryProvider);
-    final quota = await ref.read(quotaProvider.future);
     final cards = await repo.dueCards();
 
-    var allowed = cards.length;
-    var truncated = 0;
-    if (!quota.isPro) {
-      final remaining = math.max(0, Quota.maxDailyReviews - quota.reviewsToday);
-      if (cards.length > remaining) {
-        truncated = cards.length - remaining;
-        allowed = remaining;
-      }
-    }
-
     setState(() {
-      _queue = cards.take(allowed).toList();
-      _limitHit = truncated;
-      _finished = allowed == 0;
+      _queue = cards;
+      _finished = cards.isEmpty;
       _loading = false;
     });
   }
@@ -205,19 +188,6 @@ class _ReviewSessionScreenState extends ConsumerState<ReviewSessionScreen> {
               ),
               const SizedBox(height: 8),
               Text(summary, textAlign: TextAlign.center),
-              if (_limitHit > 0) ...[
-                const SizedBox(height: 12),
-                Text(
-                  '还有 $_limitHit 张因免费额度未复习',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.tertiary),
-                ),
-                TextButton(
-                  onPressed: () =>
-                      PaywallSheet.show(context: context, reason: '解锁每日无限复习'),
-                  child: const Text('了解付费方案'),
-                ),
-              ],
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 onPressed: () {

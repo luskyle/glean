@@ -71,7 +71,7 @@ class PaywallSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              '免费版：每日 30 次复习 · 记忆库上限 100 张。\n'
+              '免费版：无限复习 · 记忆库上限 100 张。\n'
               '说明：应用内购将在后续版本接入，当前为方案展示。',
               style: Theme.of(context).textTheme.bodySmall,
             ),

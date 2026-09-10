@@ -310,7 +310,7 @@ class QuotaState {
 
   bool get libraryFull => !isPro && libraryCards >= Quota.maxLibraryCards;
 
-  bool get dailyReviewFull => !isPro && reviewsToday >= Quota.maxDailyReviews;
+  bool get dailyReviewFull => false; // 已移除每日复习次数限制
 }
 
 final quotaProvider = FutureProvider<QuotaState>((ref) async {
