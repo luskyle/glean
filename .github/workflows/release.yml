@@ -65,7 +65,10 @@ jobs:
           else
             echo "未配置签名 Secrets，使用 debug 签名（正式发布请配置）"
           fi
-      - run: flutter build apk --release
+      # --android-skip-build-dependency-validation：file_picker 硬编码
+      # compileSdk 34，而其传递依赖要求 36（app 模块已用 flutter 默认 36，
+      # 插件模块 34 编译无碍，仅 AAR 元数据校验报错）
+      - run: flutter build apk --release --android-skip-build-dependency-validation
       - uses: actions/upload-artifact@v4
         with:
           name: apk
