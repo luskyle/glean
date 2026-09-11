@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'data/analytics/analytics_service.dart';
 import 'data/database/database.dart';
 import 'data/repositories/item_repository.dart';
-import 'data/repositories/media_repository.dart';
 import 'data/settings/settings_store.dart';
 import 'data/sync/cloud_drive.dart';
 import 'data/sync/sync_service.dart';
@@ -61,43 +58,24 @@ final itemRepositoryProvider = Provider<ItemRepository>((ref) {
   return ItemRepository(ref.watch(databaseProvider));
 });
 
-/// 本地素材库（链接不导入；仅本地使用）。
-final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
-  return MediaRepository(ref.watch(databaseProvider));
-});
-
-/// 素材列表（新在前）。
-final mediaAssetsProvider = FutureProvider<List<MediaAssetRow>>((ref) {
-  return ref.watch(mediaRepositoryProvider).all();
-});
-
-/// 素材目录列表（新在前）。
-final mediaFoldersProvider = FutureProvider<List<MediaFolderRow>>((ref) {
-  return ref.watch(mediaRepositoryProvider).folders();
-});
-
 // ---------------------------------------------------------------------------
 // 收藏库
 // ---------------------------------------------------------------------------
 
 /// 收藏库筛选参数。
 class LibraryFilter {
-  const LibraryFilter(
-      {this.search = '', this.lang, this.status, this.collectionId});
+  const LibraryFilter({this.search = '', this.lang, this.collectionId});
 
   final String search;
   final String? lang;
-  final String? status;
 
   /// 按分组过滤，null = 全部。
   final int? collectionId;
 
-  LibraryFilter copyWith(
-      {String? search, String? lang, String? status, int? collectionId}) {
+  LibraryFilter copyWith({String? search, String? lang, int? collectionId}) {
     return LibraryFilter(
       search: search ?? this.search,
       lang: lang ?? this.lang,
-      status: status ?? this.status,
       collectionId: collectionId ?? this.collectionId,
     );
   }
@@ -107,7 +85,6 @@ class LibraryFilter {
     return LibraryFilter(
       search: search,
       lang: lang == l ? null : l,
-      status: status,
       collectionId: collectionId,
     );
   }
@@ -117,7 +94,6 @@ class LibraryFilter {
     return LibraryFilter(
       search: search,
       lang: lang,
-      status: status,
       collectionId: id,
     );
   }
@@ -130,29 +106,22 @@ class LibraryFilter {
       other is LibraryFilter &&
       other.search == search &&
       other.lang == lang &&
-      other.status == status &&
       other.collectionId == collectionId;
 
   @override
-  int get hashCode => Object.hash(search, lang, status, collectionId);
+  int get hashCode => Object.hash(search, lang, collectionId);
 }
 
 final libraryFilterProvider = StateProvider<LibraryFilter>((ref) {
   return const LibraryFilter();
 });
 
-/// 收藏库视图模式：list | grid（初始自设置，切换时持久化）。
-final libraryViewModeProvider = StateProvider<String>((ref) {
-  return ref.watch(settingsProvider).libraryViewMode;
-});
-
-/// 收藏库流（行流，携带搜索/语言/状态/分组过滤）。
+/// 收藏库流（行流，携带搜索/语言/分组过滤）。
 final libraryItemsProvider = StreamProvider<List<ItemRow>>((ref) {
   final filter = ref.watch(libraryFilterProvider);
   return ref.watch(itemRepositoryProvider).watchLibrary(
         search: filter.search,
         lang: filter.lang,
-        status: filter.status,
         collectionId: filter.collectionId,
       );
 });
@@ -170,20 +139,8 @@ final itemCollectionLinksProvider =
 });
 
 // ---------------------------------------------------------------------------
-// 剪贴板监听
+// 主题
 // ---------------------------------------------------------------------------
-
-/// 剪贴板指纹（去重提示用，源码不含可供理解的内容）。
-String clipboardFingerprint(String text) {
-  final t = text.trim();
-  if (t.length > 200) return t.substring(0, 200);
-  return t;
-}
-
-/// 剪贴板监听开关（UI 状态，初始化自设置；切换即时启停监听）。
-final clipboardWatchEnabledProvider = StateProvider<bool>((ref) {
-  return ref.watch(settingsProvider).clipboardWatchEnabled;
-});
 
 /// 主题模式（UI 状态：system / light / dark；随设置持久化）。
 final themeModeProvider = StateProvider<ThemeMode>((ref) {
@@ -195,53 +152,8 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) {
   };
 });
 
-/// 剪贴板轮询器：App 前台时每 4s 检查一次（可关闭）。
-/// 有新的可收藏文本 → 通过 [onCapture] 回调通知 UI 弹轻提示。
-class ClipboardWatcher {
-  ClipboardWatcher({
-    required this.readClipboard,
-    required this.onCapture,
-  });
-
-  /// 读取剪贴板文本（注入以便测试）。
-  final Future<String?> Function() readClipboard;
-  final void Function(String text) onCapture;
-
-  Timer? _timer;
-  String? _lastHandled;
-  bool _enabled = false;
-
-  void start() {
-    if (_enabled) return;
-    _enabled = true;
-    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _poll());
-  }
-
-  void stop() {
-    _enabled = false;
-    _timer?.cancel();
-    _timer = null;
-  }
-
-  Future<void> _poll() async {
-    final text = await readClipboard();
-    if (text == null || text.trim().isEmpty) return;
-    final fp = clipboardFingerprint(text);
-    if (fp == _lastHandled) return;
-    if (fp.length < 2 || fp.length > 2000) return;
-    _lastHandled = fp;
-    onCapture(text.trim());
-  }
-
-  void markHandled(String text) {
-    _lastHandled = clipboardFingerprint(text);
-  }
-
-  void dispose() => stop();
-}
-
 // ---------------------------------------------------------------------------
-// 语言 / 状态标签帮助函数
+// 语言标签帮助函数
 // ---------------------------------------------------------------------------
 
 String languageLabel(ContentLang lang) {
@@ -250,25 +162,5 @@ String languageLabel(ContentLang lang) {
     ContentLang.zh => '中文',
     ContentLang.en => '英语',
     ContentLang.other => '其他',
-  };
-}
-
-/// 中文状态文案（列表徽标用）。
-/// 收藏侧语义：inbox 待归类 / active 已收藏 / archived 已归档。
-String statusLabel(String status) {
-  return switch (status) {
-    'inbox' => '待归类',
-    'active' => '已收藏',
-    'archived' => '已归档',
-    _ => status,
-  };
-}
-
-Color statusColor(String status) {
-  return switch (status) {
-    'inbox' => Colors.blueGrey,
-    'active' => Colors.green,
-    'archived' => Colors.orange,
-    _ => Colors.blueGrey,
   };
 }

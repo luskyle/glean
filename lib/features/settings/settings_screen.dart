@@ -12,8 +12,6 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
-
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
@@ -64,17 +62,6 @@ class SettingsScreen extends ConsumerWidget {
                           );
                     },
                   ),
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.content_paste_search),
-                  title: const Text('剪贴板监听'),
-                  subtitle: const Text('复制内容后提示"要收藏吗"'),
-                  value: ref.watch(clipboardWatchEnabledProvider),
-                  onChanged: (v) async {
-                    await settings.setClipboardWatch(v);
-                    ref.invalidate(settingsProvider);
-                    ref.read(clipboardWatchEnabledProvider.notifier).state = v;
-                  },
                 ),
               ],
             ),
@@ -132,7 +119,7 @@ class SettingsScreen extends ConsumerWidget {
             child: ListTile(
               leading: Icon(Icons.info_outline),
               title: Text('关于 Glean'),
-              subtitle: Text('把散落的好内容拾进来：收件箱 / 剪贴板 / 素材库 / 分类。'),
+              subtitle: Text('把散落的好内容拾进来：收藏 / 分类 / 云盘同步。'),
             ),
           ),
         ],

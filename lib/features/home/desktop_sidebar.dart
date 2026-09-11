@@ -6,19 +6,13 @@ import '../../core/theme.dart';
 import '../../data/database/database.dart';
 import '../../providers.dart';
 import '../inbox/add_item_sheet.dart';
+import '../settings/settings_screen.dart';
 
 /// iOS 风格侧边栏（HIG Sidebar）：大标题 + 分组导航 + 底部设置。
 ///
-/// 宽屏（桌面）专用；窄屏走底部 Tab，不渲染本组件。
+/// 宽屏（桌面）专用；窄屏走 AppBar，不渲染本组件。
 class DesktopSidebar extends ConsumerWidget {
-  const DesktopSidebar({
-    super.key,
-    required this.activeTab,
-    required this.onSelectTab,
-  });
-
-  final int activeTab;
-  final ValueChanged<int> onSelectTab;
+  const DesktopSidebar({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,25 +54,7 @@ class DesktopSidebar extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              // ---- 收藏箱（第一分组）----
-              _SidebarGroup(
-                children: [
-                  _SidebarRow(
-                    icon: Icons.inbox_outlined,
-                    label: '收件箱',
-                    selected: activeTab == 0,
-                    onTap: () => onSelectTab(0),
-                  ),
-                  _SidebarRow(
-                    icon: Icons.photo_library_outlined,
-                    label: '素材库',
-                    selected: activeTab == 1,
-                    onTap: () => onSelectTab(1),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // ---- 分组（第二分组）----
+              // ---- 分组（分类导航）----
               Padding(
                 padding: const EdgeInsets.fromLTRB(28, 0, 16, 6),
                 child:
@@ -126,10 +102,8 @@ class DesktopSidebar extends ConsumerWidget {
                             child: _SidebarRow(
                               icon: Icons.folder,
                               label: c.name,
-                              selected: activeTab == 0 &&
-                                  ref
-                                          .watch(libraryFilterProvider)
-                                          .collectionId ==
+                              selected:
+                                  ref.watch(libraryFilterProvider).collectionId ==
                                       c.id,
                               onTap: () => _openCollection(ref, c),
                             ),
@@ -139,7 +113,16 @@ class DesktopSidebar extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const Spacer(),
+              // ---- 底部设置 ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: _SidebarRow(
+                  icon: Icons.settings_outlined,
+                  label: '设置',
+                  onTap: () => _openSettings(context),
+                ),
+              ),
             ],
           ),
         ),
@@ -219,7 +202,6 @@ class DesktopSidebar extends ConsumerWidget {
   void _openCollection(WidgetRef ref, CollectionRow c) {
     ref.read(libraryFilterProvider.notifier).state =
         ref.read(libraryFilterProvider).withCollection(c.id);
-    onSelectTab(0);
   }
 
   void _openAddSheet(BuildContext context) {
@@ -227,6 +209,12 @@ class DesktopSidebar extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (_) => const AddItemSheet(),
+    );
+  }
+
+  void _openSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
   }
 }

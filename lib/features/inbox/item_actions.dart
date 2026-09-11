@@ -5,8 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme.dart';
 import '../../data/database/database.dart';
 import '../../providers.dart';
-import '../../shared/status_chip.dart';
-import '../library/media_library_screen.dart';
 
 /// 收藏条目详情与操作（收件箱 / 收藏库共用）：
 /// 查看 / 编辑内容、语言、状态、分组、标签；删除。
@@ -34,7 +32,6 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
   final _tagCtrl = TextEditingController();
 
   String? _lang; // null = 自动（保持原样越界时按条目原值）
-  late String _status;
   final Set<String> _tags = {};
   bool _saving = false;
 
@@ -46,7 +43,6 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
     _note = TextEditingController(text: widget.item.note ?? '');
     final raw = widget.item.lang;
     _lang = (_knownLangs.contains(raw) && raw != null) ? raw : null;
-    _status = widget.item.status;
     _loadTags();
   }
 
@@ -76,7 +72,6 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
       widget.item.id,
       note: content,
       lang: _lang,
-      status: _status,
     );
     await repo.setItemTags(widget.item.id, _tags.toList());
     ref.invalidate(libraryItemsProvider);
@@ -154,7 +149,6 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
               children: [
                 Text('收藏详情', style: Theme.of(context).textTheme.titleLarge),
                 const Spacer(),
-                StatusChip(status: _status),
               ],
             ),
             const SizedBox(height: 4),
@@ -166,11 +160,6 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
             if (item.originalUrl != null || item.sourceTitle != null) ...[
               const SizedBox(height: 12),
               _SourceRow(item: item),
-            ],
-            // 本地素材（链接素材库，回忆锚点）
-            if (item.mediaAssetId != null) ...[
-              const SizedBox(height: 12),
-              SourceMediaView(assetId: item.mediaAssetId!),
             ],
             const SizedBox(height: 16),
             TextField(
@@ -194,19 +183,6 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
                 DropdownMenuItem(value: 'other', child: Text('其他')),
               ],
               onChanged: (v) => setState(() => _lang = v),
-            ),
-            const SizedBox(height: 12),
-            // 状态（收藏整理语义）
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final s in const ['inbox', 'active', 'archived'])
-                  ChoiceChip(
-                    label: Text(statusLabel(s)),
-                    selected: _status == s,
-                    onSelected: (_) => setState(() => _status = s),
-                  ),
-              ],
             ),
             const SizedBox(height: 12),
             // 分组（主分类）

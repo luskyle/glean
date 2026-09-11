@@ -5,13 +5,12 @@ import '../../data/analytics/analytics_service.dart';
 import '../../data/repositories/item_repository.dart';
 import '../../domain/tagging/language.dart';
 import '../../providers.dart';
-import '../library/media_library_screen.dart';
 
 /// 手录收藏：**一个输入框收藏，其余全自动**（零摩擦）。
 ///
-/// - 输入内容 → 自动识别语言、默认未分类、进入收件箱
-/// - 「更多选项」折叠：类型 / 标签 / 本地素材 / 分组（可后补）
-/// - 类型（词条/语录/灵感）写入收藏来源（source），媒体优先记 photo
+/// - 输入内容 → 自动识别语言、默认未分类
+/// - 「更多选项」折叠：类型 / 标签 / 分组（可后补）
+/// - 类型（词条/语录/灵感）写入收藏来源（source）
 class AddItemSheet extends ConsumerStatefulWidget {
   const AddItemSheet({super.key});
 
@@ -27,7 +26,6 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
   String _kind = 'auto';
   final Set<String> _tags = {};
   int? _collectionId;
-  int? _mediaAssetId; // 本地素材库引用（不参与云同步）
 
   @override
   void dispose() {
@@ -53,11 +51,10 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
     }
 
     final lang = langCodeOf(detectLang(content));
-    // 类型（词条/语录/灵感）→ source；媒体优先记 photo
+    // 类型（词条/语录/灵感）→ source
     final kind = _kind == 'auto' ? _guessedKind(content) : _kind;
-    final source = _mediaAssetId != null
-        ? 'photo'
-        : (kind == 'word' || kind == 'quote' || kind == 'idea' ? kind : 'manual');
+    final source =
+        (kind == 'word' || kind == 'quote' || kind == 'idea' ? kind : 'manual');
 
     await ref.read(itemRepositoryProvider).createItem(
           note: content,
@@ -65,7 +62,6 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
           lang: lang,
           tags: _tags.toList(),
           collectionId: _collectionId,
-          mediaAssetId: _mediaAssetId,
         );
     ref.read(analyticsProvider).track(
       AnalyticsEvents.itemCollected,
@@ -76,7 +72,7 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
       Navigator.of(context).pop();
       ref.invalidate(libraryItemsProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已收藏到收件箱')),
+        const SnackBar(content: Text('已收藏')),
       );
     }
   }
@@ -180,12 +176,6 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
                 onSelectionChanged: (s) => setState(() => _kind = s.first),
               ),
               const SizedBox(height: 12),
-              // ---- 本地素材（链接素材库，不导入）----
-              _MediaPickerRow(
-                assetId: _mediaAssetId,
-                onChanged: (id) => setState(() => _mediaAssetId = id),
-              ),
-              const SizedBox(height: 12),
               TextField(
                 controller: _tagCtrl,
                 decoration: const InputDecoration(
@@ -226,80 +216,6 @@ class _AddItemSheetState extends ConsumerState<AddItemSheet> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// 素材选择行：从本地素材库挑选素材挂到收藏上（不导入、不同步）。
-class _MediaPickerRow extends ConsumerWidget {
-  const _MediaPickerRow({required this.assetId, required this.onChanged});
-
-  final int? assetId;
-  final ValueChanged<int?> onChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final assets = ref.watch(mediaAssetsProvider).value ?? const [];
-    final scheme = Theme.of(context).colorScheme;
-    final selected = assetId == null
-        ? null
-        : assets.where((a) => a.id == assetId).firstOrNull;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.image_outlined, size: 16, color: scheme.primary),
-            const SizedBox(width: 6),
-            Text('本地素材（可选）', style: Theme.of(context).textTheme.labelMedium),
-            const Spacer(),
-            // 跳去素材库
-            TextButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const MediaLibraryScreen()),
-              ),
-              icon: const Icon(Icons.photo_library_outlined, size: 16),
-              label: const Text('素材库'),
-            ),
-          ],
-        ),
-        if (assets.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              '素材库为空，先去「素材库」链接本地目录',
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-            ),
-          )
-        else
-          DropdownButton<int?>(
-            value: assetId,
-            isExpanded: true,
-            underline: const SizedBox.shrink(),
-            hint: const Text('挑选素材…'),
-            items: [
-              const DropdownMenuItem<int?>(
-                value: null,
-                child: Text('不挂素材'),
-              ),
-              for (final a in assets)
-                DropdownMenuItem<int?>(
-                  value: a.id,
-                  child: Text(
-                    a.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: (v) => onChanged(v),
-          ),
-        if (selected != null && assetId != null) ...[
-          const SizedBox(height: 8),
-          SourceMediaView(assetId: assetId!, height: 120),
-        ],
-      ],
     );
   }
 }

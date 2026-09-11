@@ -6,10 +6,10 @@ import '../../domain/tagging/language.dart';
 /// 默认「未分类」分组名（列表排序时恒置底）。
 const kUncategorizedName = '未分类';
 
-/// 收藏域仓储（Glean 收藏助手）：收件箱 → 整理 → 素材库/分组/标签。
+/// 收藏域仓储（Glean 收藏助手）：收藏 → 分类/标签管理。
 ///
-/// 数据模型：收藏条目（items）为一等公民，分类（collections）/标签
-/// （item_tags）/素材（media_assets）均为其附注；无卡片/SRS 概念。
+/// 数据模型：收藏条目（items）为一等公民，分类（collections）
+/// /标签（item_tags）为其附注；无卡片/SRS/素材库概念。
 class ItemRepository {
   ItemRepository(this.db);
 
@@ -19,7 +19,7 @@ class ItemRepository {
   // 收藏条目
   // ---------------------------------------------------------------------------
 
-  /// 收藏库流（新在前），支持搜索/语言/状态/分组过滤。
+  /// 收藏库流（新在前），支持搜索/语言/分组过滤。
   Stream<List<ItemRow>> watchLibrary({
     String search = '',
     String? lang,
@@ -102,8 +102,7 @@ class ItemRepository {
   /// 创建收藏：
   /// - [note] 为收藏内容（主内容）
   /// - 语言未指定时按内容自动检测
-  /// - 默认进入收件箱（status='inbox'，待整理）
-  /// - 可选：分类（自动设为主分类）、标签、素材、出处
+  /// - 可选：分类（自动设为主分类）、标签、出处
   Future<ItemRow> createItem({
     required String note,
     String source = 'manual',
