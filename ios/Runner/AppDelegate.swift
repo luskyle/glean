@@ -1,7 +1,7 @@
 import Flutter
 import UIKit
 
-/// 拾忆 iCloud Drive 通道（B 档云盘同步）：
+/// Glean iCloud Drive 通道（B 档云盘同步）：
 /// 备份文件写入用户 iCloud 容器的 Documents/backup.json（用户配额，服务器零存储）。
 /// 需要 Xcode → Signing & Capabilities → + iCloud → 勾选「iCloud Documents」。
 @main
@@ -18,10 +18,10 @@ import UIKit
     GeneratedPluginRegistrant.register(with: registry)
 
     // —— iCloud Drive 通道 ——
-    let messenger: FlutterBinaryMessenger = registry.registrar(forPlugin: "ShiyiICloud")
+    let messenger: FlutterBinaryMessenger = registry.registrar(forPlugin: "GleanICloud")
       .messenger()
     let channel = FlutterMethodChannel(
-      name: "shiyi/icloud", binaryMessenger: messenger)
+      name: "glean/icloud", binaryMessenger: messenger)
     channel.setMethodCallHandler { call, result in
       guard let container = FileManager.default.url(forUbiquityContainerIdentifier: nil) else {
         if call.method == "isAvailable" {

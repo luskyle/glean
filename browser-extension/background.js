@@ -1,6 +1,6 @@
 /**
  * Service Worker（简洁版）：
- * - 右键「收藏到拾忆」→ 子菜单：选分类后收藏… / 收藏当前网页 / 各分类直达
+ * - 右键「收藏到 Glean」→ 子菜单：选分类后收藏… / 收藏当前网页 / 各分类直达
  * - 菜单上下文：selection（划词）与 page（网页）分别提供对应入口
  * - 菜单在 SW 启动 / 扩展安装更新 / 弹窗打开时重建；
  *   分类列表来自云端快照（popup 刷新后生效）
@@ -26,19 +26,19 @@ async function rebuildMenus() {
   chrome.contextMenus.removeAll(() => {
     // 根菜单：划词与网页上下文都出现
     chrome.contextMenus.create({
-      id: 'shiyi-root',
-      title: '收藏到拾忆',
+      id: 'glean-root',
+      title: '收藏到 Glean',
       contexts: ['selection', 'page'],
     });
     // 划词 → 弹窗选分类收藏（带选区文本）
     chrome.contextMenus.create({
-      id: 'shiyi-with-cat',
-      parentId: 'shiyi-root',
+      id: 'glean-with-cat',
+      parentId: 'glean-root',
       title: '选分类后收藏…',
       contexts: ['selection'],
     });
     chrome.contextMenus.create({
-      parentId: 'shiyi-root',
+      parentId: 'glean-root',
       type: 'separator',
       contexts: ['selection', 'page'],
     });
@@ -50,13 +50,13 @@ async function rebuildMenus() {
         try {
           chrome.contextMenus.create({
             id: `col-${c.id}`,
-            parentId: 'shiyi-root',
+            parentId: 'glean-root',
             title: `划词收藏到「${c.name}」`,
             contexts: ['selection'],
           });
           chrome.contextMenus.create({
             id: `page-col-${c.id}`,
-            parentId: 'shiyi-root',
+            parentId: 'glean-root',
             title: `网页收藏到「${c.name}」`,
             contexts: ['page'],
           });
@@ -83,7 +83,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const text = (info.selectionText || '').trim();
   if (!text) return;
 
-  if (info.menuItemId === 'shiyi-with-cat') {
+  if (info.menuItemId === 'glean-with-cat') {
     // openPopup 必须在用户手势同步上下文：storage.set 不 await
     chrome.storage.local.set({
       pendingText: text,
@@ -107,11 +107,11 @@ async function saveWith(text, url, title, collectionId) {
     if (!cfg.url) return false;
     const snap = (await davGet(cfg)) || emptySnapshot();
     if (!snap.rows) snap.rows = {};
-    appendCard(snap, text, '', { url, title, collectionId });
+    appendItem(snap, text, { url, title, collectionId });
     await davPut(cfg, snap); // davPut 内部会 pingDesktop
     return true;
   } catch (e) {
-    console.error('shiyi save failed', e);
+    console.error('glean save failed', e);
     return false;
   }
 }
@@ -124,18 +124,18 @@ async function savePageWith(url, title, collectionId) {
     if (!cfg.url) return false;
     const snap = (await davGet(cfg)) || emptySnapshot();
     if (!snap.rows) snap.rows = {};
-    appendCard(snap, title || url, url, { url, title, collectionId });
+    appendItem(snap, title || url, { url, title, collectionId });
     await davPut(cfg, snap);
     return true;
   } catch (e) {
-    console.error('shiyi save page failed', e);
+    console.error('glean save page failed', e);
     return false;
   }
 }
 
 function emptySnapshot() {
   return {
-    app: 'shiyi',
+    app: 'glean',
     version: '0.1.0',
     exported_at: new Date().toISOString(),
     rows: {

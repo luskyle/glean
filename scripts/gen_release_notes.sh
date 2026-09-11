@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 生成拾忆发布说明（GitHub Release notes）。
+# 生成 Glean 发布说明（GitHub Release notes）。
 # 从 git log 提取两个标签之间的提交，按 Conventional Commits 风格分组输出中文 Markdown。
 #
 # 用法: gen_release_notes.sh NEW_TAG [PREV_TAG]
@@ -89,9 +89,9 @@ print_group() {
   printf '\n'
 }
 
-printf '# 拾忆 %s\n\n' "$NEW_TAG"
+printf '# Glean %s\n\n' "$NEW_TAG"
 printf '> 数据范围：%s · 提交 %d 个 · 变更文件 %d 个\n\n' "$RANGE_LABEL" "$COMMITS" "$FILES"
-printf '把你想记住的任何东西收进来，它会在对的时间提醒你复习。\n\n'
+printf '把散落的好内容拾进来——收藏、归类、同步上你的云盘，数据永远属于你。\n\n'
 
 print_group feat
 print_group fix
@@ -105,10 +105,10 @@ print_group other
 cat <<'EOF'
 ## 📦 下载安装
 
-- **Android**：下载 `shiyi-v*.apk` 直接安装。
-- **Linux**：下载 `shiyi-linux-x64.tar.gz`，解压后运行 `bundle/shiyi`。
+- **Android**：下载 `app-release.apk` 直接安装。
+- **Linux**：下载 `glean-linux-x64.tar.gz`，解压后运行 `bundle/glean`。
 - **iOS**：当前产物为**未签名** Runner.app（zip），需 Apple 开发者证书签名后分发。
 
-> 数据说明：收藏与复习数据默认仅保存在本机；可在「设置 → 导出我的收藏库」导出 JSON。
-> 隐私承诺：服务器不存储任何媒体文件。
+> 数据说明：收藏数据默认仅保存在本机；可在「设置 → 导出收藏」导出 zip（JSON 机器可读）。
+> 隐私承诺：服务器不存储任何数据，同步只走你自己的 WebDAV 云盘。
 EOF

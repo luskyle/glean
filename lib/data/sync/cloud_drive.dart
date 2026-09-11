@@ -26,7 +26,7 @@ abstract class CloudDrive {
   Future<String?> download();
 }
 
-const _icloudChannel = MethodChannel('shiyi/icloud');
+const _icloudChannel = MethodChannel('glean/icloud');
 
 /// iCloud Drive 适配器：Native（Swift）实现位于 ios/Runner/AppDelegate.swift。
 /// 文件写入 iCloud 容器的 Documents 目录（用户配额，开发者零成本）。
@@ -67,7 +67,7 @@ class WebDavAdapter implements CloudDrive {
     required this.baseUrl,
     required this.username,
     required this.password,
-    this.remotePath = '/shiyi/backup.json',
+    this.remotePath = '/glean/backup.json',
   });
 
   final String baseUrl;

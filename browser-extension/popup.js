@@ -53,7 +53,7 @@ async function saveSelection() {
   if (!cfg.url) { setMsg('请先配置 WebDAV', false); $('settingsBox').open = true; return; }
   try {
     const snap = (await davGet(cfg)) || {
-      app: 'shiyi', version: '0.1.0', exported_at: new Date().toISOString(),
+      app: 'glean', version: '0.1.0', exported_at: new Date().toISOString(),
       rows: { collections: lastCollections, items: [], cards: [],
               review_logs: [], item_collections: [], item_tags: [] },
     };
@@ -62,14 +62,14 @@ async function saveSelection() {
       snap.rows.collections = lastCollections;
     }
     const collectionId = parseInt($('collection').value, 10) || null;
-    // 已成卡直接进复习队列（带来源页标题）
-    appendCard(snap, text, '', {
+    // 进收件箱（带来源页标题）
+    appendItem(snap, text, {
       url: $('pageUrl').value || null,
       title: $('pageTitle').value || null,
       collectionId,
     });
     await davPut(cfg, snap);
-    setMsg('已收藏，明天开始复习 ✓', true);
+    setMsg('已收藏 ✓', true);
     $('text').value = '';
   } catch (e) {
     setMsg('收藏失败：' + e.message, false);

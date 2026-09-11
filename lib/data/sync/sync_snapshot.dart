@@ -14,7 +14,7 @@ class SyncSnapshot {
 
   /// 构建当前库的全量快照。
   ///
-  /// 兼容契约：快照仍带 `app: shiyi`（浏览器插件等旧写入端共同约定）；
+  /// 快照契约：`app: glean`（App 与浏览器插件共用同一份 JSON）；
   /// 旧快照里的 cards/review_logs 段在合并时被忽略（Glean 已无对应表）。
   static Future<SyncSnapshot> capture(AppDatabase db) async {
     final items = await db.select(db.items).get();
@@ -23,7 +23,7 @@ class SyncSnapshot {
     final tags = await db.select(db.itemTags).get();
 
     final payload = <String, Object?>{
-      'app': 'shiyi',
+      'app': 'glean',
       'version': '0.1.0',
       'exported_at': DateTime.now().toIso8601String(),
       'rows': <String, Object?>{

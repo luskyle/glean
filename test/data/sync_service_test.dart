@@ -87,7 +87,7 @@ void main() {
 
     // 云端快照仍包含已删除的「日语」（旧数据），另有一个未被删除的新分类
     final snap = SyncSnapshot.decode(
-      '{"app":"shiyi","rows":{"collections":['
+      '{"app":"glean","rows":{"collections":['
       '{"id":$japId,"name":"日语","parentId":null,"ownerId":null,'
       '"isSystem":false,"createdAt":"2026-09-01T00:00:00.000Z"},'
       '{"id":9001,"name":"法语","parentId":null,"ownerId":null,'
@@ -140,7 +140,7 @@ void main() {
     // 旧快照（无 sourceTitle 字段）合并不报错、字段为 null；
     // 旧 items 行里的 cardId 等已删字段被忽略
     final legacy = SyncSnapshot.decode(
-      '{"app":"shiyi","rows":{"collections":[],'
+      '{"app":"glean","rows":{"collections":[],'
       '"cards":[],"items":[{"id":9901,"cardId":null,"source":"manual",'
       '"mediaPath":null,"originalUrl":null,"note":"旧数据","lang":"zh",'
       '"status":"learning","createdAt":1788846000000}],'
@@ -163,7 +163,7 @@ void main() {
     final text = snap.encode();
 
     final decoded = SyncSnapshot.decode(text);
-    expect(decoded.payload['app'], 'shiyi');
+    expect(decoded.payload['app'], 'glean');
     expect(decoded.rows['items'], isA<List>());
     expect((decoded.rows['items'] as List).length, 1);
     // Glean 无卡片/复习日志表：快照中这两段恒为空列表（兼容旧契约）

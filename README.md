@@ -6,8 +6,8 @@
 **官网**：<https://luskyle.github.io/glean/>　｜　[![官网](https://img.shields.io/badge/Glean-%E5%AE%98%E7%BD%91-2F6BFF?style=flat-square)](https://luskyle.github.io/glean/)
 　[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg?style=flat-square)](LICENSE)
 
-依据《拾忆App架构设计》《开发计划-分阶段功能路线》《技术调研-核心技术选型》
-（vpub/docs/强化记忆）实现的 **收藏侧 MVP**：收件箱 + 剪贴板 + 素材库 + 云盘同步的一条收藏管道。
+依据《收藏管道设计》《内容分类机制设计》《收藏数据存储方案》等设计文档
+（docs/design）实现的 **收藏侧 MVP**：收件箱 + 剪贴板 + 素材库 + 云盘同步的一条收藏管道。
 
 ## 当前版本能力（v0.1.0）
 
