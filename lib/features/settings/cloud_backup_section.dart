@@ -3,13 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../data/sync/netdisk/ali_drive.dart';
 import '../../data/sync/netdisk/baidu_auth.dart';
+import '../../data/sync/netdisk/common.dart';
+import '../../data/sync/netdisk/onedrive_drive.dart';
 import '../../providers.dart';
 
-/// 云盘备份配置（B/C 档）：通道选择 + 各通道凭据 + 立即备份/恢复。
+/// 云盘备份配置：通道选择 + 各通道凭据 + 立即备份/恢复。
 /// - iCloud Drive：iOS 主力通道
 /// - WebDAV：坚果云 / NAS（零开发直连）
-/// - 百度网盘：C 档原生适配器（开放平台申请 Client Id/Secret + oob 授权码绑定）
+/// - 百度网盘 / 阿里云盘 / OneDrive：C 档原生适配器
+///   （开放平台申请 Client Id/Secret + oob 授权码绑定）
 class CloudBackupSection extends ConsumerStatefulWidget {
   const CloudBackupSection({super.key});
 
@@ -21,12 +25,12 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
   final _urlCtrl = TextEditingController();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  final _baiduIdCtrl = TextEditingController();
-  final _baiduSecretCtrl = TextEditingController();
+  final _idCtrl = TextEditingController(); // 当前网盘通道的 Client ID
+  final _secretCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   String _channel = 'none';
   bool _busy = false;
-  bool _baiduBusy = false;
+  bool _oauthBusy = false;
 
   @override
   void initState() {
@@ -36,8 +40,21 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
     _urlCtrl.text = s.webdavUrl ?? '';
     _userCtrl.text = s.webdavUser ?? '';
     _passCtrl.text = s.webdavPassword ?? '';
-    _baiduIdCtrl.text = s.baiduClientId ?? '';
-    _baiduSecretCtrl.text = s.baiduClientSecret ?? '';
+    _loadChannelCreds(s);
+  }
+
+  void _loadChannelCreds(dynamic s) {
+    switch (_channel) {
+      case 'baidu':
+        _idCtrl.text = s.baiduClientId ?? '';
+        _secretCtrl.text = s.baiduClientSecret ?? '';
+      case 'ali':
+        _idCtrl.text = s.aliClientId ?? '';
+        _secretCtrl.text = s.aliClientSecret ?? '';
+      case 'onedrive':
+        _idCtrl.text = s.oneClientId ?? '';
+        _secretCtrl.text = s.oneClientSecret ?? '';
+    }
   }
 
   @override
@@ -45,8 +62,8 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
     _urlCtrl.dispose();
     _userCtrl.dispose();
     _passCtrl.dispose();
-    _baiduIdCtrl.dispose();
-    _baiduSecretCtrl.dispose();
+    _idCtrl.dispose();
+    _secretCtrl.dispose();
     _codeCtrl.dispose();
     super.dispose();
   }
@@ -54,6 +71,7 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
   Future<void> _selectChannel(String channel) async {
     final s = ref.read(settingsProvider);
     await s.setSyncChannel(channel);
+    _loadChannelCreds(s);
     setState(() => _channel = channel);
     ref.invalidate(syncServiceProvider);
   }
@@ -73,65 +91,132 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
     await _run('sync');
   }
 
-  // ---- 百度网盘 ----
+  // ---- OAuth 网盘（百度 / 阿里 / OneDrive 经通用面板接入）----
 
-  BaiduTokenStore get _baiduTokens =>
-      BaiduTokenStore(ref.read(sharedPrefsProvider));
-
-  Future<void> _saveBaiduCreds() async {
-    final s = ref.read(settingsProvider);
-    await s.setBaiduClientId(_baiduIdCtrl.text.trim());
-    await s.setBaiduClientSecret(_baiduSecretCtrl.text.trim());
-    ref.invalidate(syncServiceProvider);
-    _snack('百度网盘凭据已保存');
+  bool _hasToken(String channel) {
+    final prefs = ref.read(sharedPrefsProvider);
+    return switch (channel) {
+      'baidu' => BaiduTokenStore(prefs).hasToken,
+      'ali' => PrefsTokenStore(prefs, 'ali').hasToken,
+      'onedrive' => PrefsTokenStore(prefs, 'onedrive').hasToken,
+      _ => false,
+    };
   }
 
-  Future<void> _openBaiduAuth() async {
-    final id = _baiduIdCtrl.text.trim();
+  Future<void> _saveCreds(String channel) async {
+    final s = ref.read(settingsProvider);
+    final id = _idCtrl.text.trim();
+    final secret = _secretCtrl.text.trim();
+    switch (channel) {
+      case 'baidu':
+        await s.setBaiduClientId(id);
+        await s.setBaiduClientSecret(secret);
+      case 'ali':
+        await s.setAliClientId(id);
+        await s.setAliClientSecret(secret);
+      case 'onedrive':
+        await s.setOneClientId(id);
+        await s.setOneClientSecret(secret);
+    }
+    ref.invalidate(syncServiceProvider);
+    _snack('$channel 凭据已保存');
+  }
+
+  Uri? _authorizeUri(String channel) {
+    final id = _idCtrl.text.trim();
     if (id.isEmpty) {
       _snack('请先填写并保存 Client ID');
-      return;
+      return null;
     }
-    final uri = Uri.parse(BaiduAuth.buildAuthorizeUrl(id));
+    return Uri.parse(switch (channel) {
+      'baidu' => BaiduAuth.buildAuthorizeUrl(id),
+      'ali' => AliDrive.buildAuthorizeUrl(id),
+      'onedrive' => OneDriveDrive.buildAuthorizeUrl(id),
+      _ => throw UnsupportedError(channel),
+    });
+  }
+
+  Future<void> _openAuth(String channel) async {
+    final uri = _authorizeUri(channel);
+    if (uri == null) return;
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
     _snack('浏览器授权后，把地址栏 code 复制粘贴到下方');
   }
 
-  Future<void> _bindBaiduCode() async {
+  Future<void> _exchange(String channel) async {
     final code = _codeCtrl.text.trim();
-    final id = _baiduIdCtrl.text.trim();
-    final secret = _baiduSecretCtrl.text.trim();
+    final id = _idCtrl.text.trim();
+    final secret = _secretCtrl.text.trim();
     if (code.isEmpty || id.isEmpty || secret.isEmpty) {
       _snack('请填写 Client ID / Secret 与授权码');
       return;
     }
-    setState(() => _baiduBusy = true);
+    setState(() => _oauthBusy = true);
     try {
-      final t = await BaiduAuth.exchangeCode(
-        code: code,
-        clientId: id,
-        clientSecret: secret,
-      );
-      await _baiduTokens.save(t);
+      switch (channel) {
+        case 'baidu':
+          final t = await BaiduAuth.exchangeCode(
+            code: code,
+            clientId: id,
+            clientSecret: secret,
+          );
+          await BaiduTokenStore(ref.read(sharedPrefsProvider)).save(t);
+        case 'ali':
+          final t = await exchangeNetdiskToken(
+            endpoint: Uri.parse(AliDrive.tokenUrl),
+            body: {
+              'grant_type': 'authorization_code',
+              'code': code,
+              'client_id': id,
+              'client_secret': secret,
+            },
+          );
+          await PrefsTokenStore(ref.read(sharedPrefsProvider), 'ali').save(t);
+        case 'onedrive':
+          final t = await exchangeNetdiskToken(
+            endpoint: Uri.parse(OneDriveDrive.tokenUrl),
+            body: {
+              'grant_type': 'authorization_code',
+              'code': code,
+              'client_id': id,
+              'client_secret': secret,
+              'redirect_uri': 'oob',
+              'scope': 'Files.ReadWrite.AppFolder offline_access User.Read',
+            },
+          );
+          await PrefsTokenStore(ref.read(sharedPrefsProvider), 'onedrive').save(t);
+      }
       _codeCtrl.clear();
       ref.invalidate(syncServiceProvider);
       _snack('授权成功，可以同步了');
     } catch (e) {
       _snack('授权失败：$e');
     } finally {
-      if (mounted) setState(() => _baiduBusy = false);
+      if (mounted) setState(() => _oauthBusy = false);
     }
   }
 
-  Future<void> _unbindBaidu() async {
-    await _baiduTokens.clear();
+  Future<void> _unbind(String channel) async {
+    final prefs = ref.read(sharedPrefsProvider);
+    switch (channel) {
+      case 'baidu':
+        await BaiduTokenStore(prefs).clear();
+      case 'ali':
+        await PrefsTokenStore(prefs, 'ali').clear();
+      case 'onedrive':
+        await PrefsTokenStore(prefs, 'onedrive').clear();
+    }
     ref.invalidate(syncServiceProvider);
-    _snack('已解除百度网盘授权');
+    _snack('已解除授权');
   }
 
-  // ---- 通用执行 ----
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // ---- 通用 ----
 
   Future<void> _run(String action) async {
     setState(() => _busy = true);
@@ -139,8 +224,8 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
     try {
       final svc = ref.read(syncServiceProvider);
       final String? err = switch (action) {
-        'sync' => await svc.syncNow(), // 安全同步：拉取合并 → 推送全量
-        'restore' => await svc.restore(), // 强制从云端合并
+        'sync' => await svc.syncNow(),
+        'restore' => await svc.restore(),
         _ => await svc.backup(),
       };
       if (err != null) {
@@ -165,19 +250,16 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
     }
   }
 
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(settingsProvider);
     final last = s.lastBackupAt;
-    final tokens = _baiduTokens;
     final channelLabel = switch (_channel) {
       'icloud' => 'iCloud Drive',
       'webdav' => 'WebDAV',
       'baidu' => '百度网盘',
+      'ali' => '阿里云盘',
+      'onedrive' => 'OneDrive',
       _ => '未配置',
     };
 
@@ -206,22 +288,30 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 6),
-            Text(
+            const Text(
               '数据只同步文本元数据（收藏/分组/标签），媒体永不进入服务器',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'icloud', label: Text('iCloud Drive')),
-                ButtonSegment(value: 'webdav', label: Text('WebDAV')),
-                ButtonSegment(value: 'baidu', label: Text('百度网盘')),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final (v, label) in const [
+                  ('icloud', 'iCloud Drive'),
+                  ('webdav', 'WebDAV'),
+                  ('baidu', '百度网盘'),
+                  ('ali', '阿里云盘'),
+                  ('onedrive', 'OneDrive'),
+                ])
+                  ChoiceChip(
+                    label: Text(label),
+                    selected: _channel == v,
+                    onSelected: (_) => _selectChannel(v),
+                  ),
               ],
-              selected: {_channel},
-              onSelectionChanged: (v) => _selectChannel(v.first),
             ),
+            const SizedBox(height: 12),
             if (_channel == 'webdav') ...[
-              const SizedBox(height: 12),
               TextField(
                 controller: _urlCtrl,
                 decoration: const InputDecoration(
@@ -257,18 +347,19 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
                 ),
               ),
             ],
-            if (_channel == 'baidu') ...[
-              const SizedBox(height: 12),
+            if (_channel == 'baidu' ||
+                _channel == 'ali' ||
+                _channel == 'onedrive') ...[
               TextField(
-                controller: _baiduIdCtrl,
+                controller: _idCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Client ID',
-                  hintText: '百度开放平台申请的 API Key',
+                  hintText: '开放平台申请的 API Key',
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
-                controller: _baiduSecretCtrl,
+                controller: _secretCtrl,
                 obscureText: true,
                 decoration: const InputDecoration(labelText: 'Client Secret'),
               ),
@@ -276,17 +367,19 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
               Align(
                 alignment: Alignment.centerRight,
                 child: OutlinedButton(
-                  onPressed: _saveBaiduCreds,
+                  onPressed: () => _saveCreds(_channel),
                   child: const Text('保存凭据'),
                 ),
               ),
               const Divider(height: 28),
-              if (!tokens.hasToken) ...[
-                Text('授权三步：① 打开授权页 → ② 复制授权码 → ③ 粘贴并绑定',
-                    style: Theme.of(context).textTheme.bodySmall),
+              if (!_hasToken(_channel)) ...[
+                const Text(
+                  '授权三步：① 打开授权页 → ② 复制授权码 → ③ 粘贴并绑定',
+                  style: TextStyle(fontSize: 12),
+                ),
                 const SizedBox(height: 8),
                 FilledButton.tonalIcon(
-                  onPressed: _openBaiduAuth,
+                  onPressed: () => _openAuth(_channel),
                   icon: const Icon(Icons.open_in_new, size: 18),
                   label: const Text('打开网页授权'),
                 ),
@@ -302,7 +395,7 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: FilledButton(
-                    onPressed: _baiduBusy ? null : _bindBaiduCode,
+                    onPressed: _oauthBusy ? null : () => _exchange(_channel),
                     child: const Text('绑定授权'),
                   ),
                 ),
@@ -314,12 +407,12 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '已授权百度网盘（令牌随同步自动刷新）',
+                        '已授权 $channelLabel（令牌随同步自动刷新）',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                     TextButton(
-                      onPressed: _unbindBaidu,
+                      onPressed: () => _unbind(_channel),
                       child: const Text('解绑'),
                     ),
                   ],

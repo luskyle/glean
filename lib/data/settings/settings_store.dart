@@ -51,6 +51,26 @@ class SettingsStore {
   Future<void> setBaiduClientSecret(String v) =>
       _prefs.setString('settings.baidu_client_secret', v);
 
+  // ---- 阿里云盘（C 档网盘适配器）----
+
+  String? get aliClientId => _prefs.getString('settings.ali_client_id');
+  Future<void> setAliClientId(String v) =>
+      _prefs.setString('settings.ali_client_id', v);
+
+  String? get aliClientSecret => _prefs.getString('settings.ali_client_secret');
+  Future<void> setAliClientSecret(String v) =>
+      _prefs.setString('settings.ali_client_secret', v);
+
+  // ---- OneDrive（C 档网盘适配器）----
+
+  String? get oneClientId => _prefs.getString('settings.one_client_id');
+  Future<void> setOneClientId(String v) =>
+      _prefs.setString('settings.one_client_id', v);
+
+  String? get oneClientSecret => _prefs.getString('settings.one_client_secret');
+  Future<void> setOneClientSecret(String v) =>
+      _prefs.setString('settings.one_client_secret', v);
+
   /// 最近一次备份时间（本地展示用）。
   DateTime? get lastBackupAt {
     final raw = _prefs.getString('settings.last_backup_at');

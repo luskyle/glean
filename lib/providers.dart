@@ -7,8 +7,11 @@ import 'data/database/database.dart';
 import 'data/repositories/item_repository.dart';
 import 'data/settings/settings_store.dart';
 import 'data/sync/cloud_drive.dart';
+import 'data/sync/netdisk/ali_drive.dart';
 import 'data/sync/netdisk/baidu_auth.dart';
 import 'data/sync/netdisk/baidu_drive.dart';
+import 'data/sync/netdisk/common.dart';
+import 'data/sync/netdisk/onedrive_drive.dart';
 import 'data/sync/sync_service.dart';
 import 'domain/tagging/language.dart';
 
@@ -57,6 +60,30 @@ final syncServiceProvider = Provider<SyncService>((ref) {
         clientId: settings.baiduClientId!.trim(),
         clientSecret: settings.baiduClientSecret ?? '',
         tokenStore: BaiduTokenStore(ref.watch(sharedPrefsProvider)),
+      ),
+    );
+  }
+  if (settings.syncChannel == 'ali' &&
+      settings.aliClientId != null &&
+      settings.aliClientId!.trim().isNotEmpty) {
+    return SyncService(
+      db: db,
+      cloud: AliDrive(
+        clientId: settings.aliClientId!.trim(),
+        clientSecret: settings.aliClientSecret ?? '',
+        tokenStore: PrefsTokenStore(ref.watch(sharedPrefsProvider), 'ali'),
+      ),
+    );
+  }
+  if (settings.syncChannel == 'onedrive' &&
+      settings.oneClientId != null &&
+      settings.oneClientId!.trim().isNotEmpty) {
+    return SyncService(
+      db: db,
+      cloud: OneDriveDrive(
+        clientId: settings.oneClientId!.trim(),
+        clientSecret: settings.oneClientSecret ?? '',
+        tokenStore: PrefsTokenStore(ref.watch(sharedPrefsProvider), 'onedrive'),
       ),
     );
   }

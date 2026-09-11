@@ -21,8 +21,8 @@ originalUrl/sourceTitle/htmlClip/mediaType/coverUrl/note/lang/status/createdAt�
 
 > **实施状态（2026-09-11）**：V1（链接/选区/图片）与 V1.1（视频·音频/文件、超体积询问）
 > 已落地；V2 已落地整页离线、App 离线页打开、批量图片收藏、云盘媒体统计与孤儿清理；
-> **网盘适配器 C 档：百度网盘已实现**（OAuth + 分片上传 + 媒体接口，协议 5 项单测）。
-> 剩余：阿里云盘等更多网盘适配器（同框架）、离线页内嵌阅读器（当前走系统应用打开）。
+> **网盘适配器 C 档：百度、阿里云盘、OneDrive 已实现**（OAuth + 分片上传 + 媒体接口，
+> 协议单测 9 项）。剩余：夸克/123 等更多网盘（同框架）、离线页内嵌阅读器（走系统应用打开）。
 
 ---
 
@@ -125,9 +125,15 @@ WebDAV = 统一通道。**支持 WebDAV 的服务直接打通；不支持的走 
 Glean 侧零改动。文档给出 3 分钟配置指南（下载 → 添加存储 → 开 WebDAV → 填进 Glean）。
 
 **C 档（原生 API 适配器）**：`CloudDrive` 抽象（快照 + 媒体接口）已落地；
-**百度网盘适配器已实现**（`lib/data/sync/netdisk/`）：OAuth 令牌管理（oob 授权码
-绑定 + 自动刷新）、superfile2 分片上传、下载 / 列表 / 删除、配额接口对齐。
-阿里云盘等后续网盘按同一框架补齐（各自开放平台应用 + 认证流程）。
+适配器家族（`lib/data/sync/netdisk/`，共享 `PrefsTokenStore` 令牌层与 OAuth 通用面板）：
+
+| 网盘 | 适配器 | 上传方式 | 目录 |
+|---|---|---|---|
+| 百度网盘 | `baidu_drive` | superfile2 分片（≤4MB/片） | `/apps/glean/`（应用目录） |
+| 阿里云盘 | `ali_drive` | create → PUT part → complete | 根 `media` 子目录 |
+| OneDrive | `onedrive_drive` | 简单 PUT（≤4MB）/ upload session 分片 | AppFolder 专用目录 |
+
+均实现快照 + 媒体（读/列/删）与令牌自动刷新；授权为「浏览器授权页 → 粘贴 code」统一流程。
 
 **容量提示**：坚果云免费 1GB → 媒体默认「仅引用」，存文件前检查配额并明确提示；
 NAS 无配额顾虑 → 推荐「引用 + 本地文件」双写。
