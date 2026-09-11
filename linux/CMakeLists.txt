@@ -1,5 +1,14 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.13)
+
+# 链接器修复：clang++ 默认搜 gcc-12 的 libstdc++，但本机只装了 gcc-11。
+# 用 *_LINKER_FLAGS 而非 CXX_FLAGS（-L 放编译 flags 会被 -Werror 判为 unused）。
+# 置于 project() 之前：编译器自测链接（CMakeTestCXXCompiler）也需要找到 libstdc++。
+if(EXISTS "/usr/lib/gcc/x86_64-linux-gnu/11/libstdc++.so")
+  list(APPEND CMAKE_EXE_LINKER_FLAGS "-L/usr/lib/gcc/x86_64-linux-gnu/11")
+  list(APPEND CMAKE_SHARED_LINKER_FLAGS "-L/usr/lib/gcc/x86_64-linux-gnu/11")
+endif()
+
 project(runner LANGUAGES CXX)
 
 # 校准 C++ 标准库头文件路径：flutter-clang 固定查找 gcc-12 的
