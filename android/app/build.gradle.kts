@@ -16,8 +16,8 @@ val hasCiSigning = !ciKeystorePath.isNullOrBlank() &&
 
 android {
     namespace = "com.glean.app"
-    // file_picker 等插件要求 compileSdk >= 36（flutter 默认值可能偏低）
-    compileSdk = 36
+    // compileSdk 统一走 gradle.properties 的 flutter.compileSdkVersion（36）
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
