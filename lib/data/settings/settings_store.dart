@@ -40,6 +40,17 @@ class SettingsStore {
   Future<void> setWebdavPassword(String v) =>
       _prefs.setString('settings.webdav_password', v);
 
+  // ---- 百度网盘（C 档网盘适配器）----
+
+  /// 客户端 ID / Secret（百度开放平台申请，PCS 网盘权限）。
+  String? get baiduClientId => _prefs.getString('settings.baidu_client_id');
+  Future<void> setBaiduClientId(String v) =>
+      _prefs.setString('settings.baidu_client_id', v);
+
+  String? get baiduClientSecret => _prefs.getString('settings.baidu_client_secret');
+  Future<void> setBaiduClientSecret(String v) =>
+      _prefs.setString('settings.baidu_client_secret', v);
+
   /// 最近一次备份时间（本地展示用）。
   DateTime? get lastBackupAt {
     final raw = _prefs.getString('settings.last_backup_at');

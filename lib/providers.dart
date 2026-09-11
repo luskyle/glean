@@ -7,6 +7,8 @@ import 'data/database/database.dart';
 import 'data/repositories/item_repository.dart';
 import 'data/settings/settings_store.dart';
 import 'data/sync/cloud_drive.dart';
+import 'data/sync/netdisk/baidu_auth.dart';
+import 'data/sync/netdisk/baidu_drive.dart';
 import 'data/sync/sync_service.dart';
 import 'domain/tagging/language.dart';
 
@@ -43,6 +45,18 @@ final syncServiceProvider = Provider<SyncService>((ref) {
         baseUrl: settings.webdavUrl!.trim(),
         username: settings.webdavUser ?? '',
         password: settings.webdavPassword ?? '',
+      ),
+    );
+  }
+  if (settings.syncChannel == 'baidu' &&
+      settings.baiduClientId != null &&
+      settings.baiduClientId!.trim().isNotEmpty) {
+    return SyncService(
+      db: db,
+      cloud: BaiduDrive(
+        clientId: settings.baiduClientId!.trim(),
+        clientSecret: settings.baiduClientSecret ?? '',
+        tokenStore: BaiduTokenStore(ref.watch(sharedPrefsProvider)),
       ),
     );
   }

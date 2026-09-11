@@ -33,6 +33,7 @@ dependencies:
   # 打开网页原文（收藏出处回看）
   url_launcher: ^6.3.0
   flutter_widget_from_html_core: ^0.17.4
+  http: ^1.6.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
