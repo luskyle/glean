@@ -18,7 +18,8 @@ import UIKit
     GeneratedPluginRegistrant.register(with: registry)
 
     // —— iCloud Drive 通道 ——
-    let messenger: FlutterBinaryMessenger = registry.registrar(forPlugin: "GleanICloud")
+    // registrar(forPlugin:) 返回 optional：对自定义通道名会创建 registrar，强制解包
+    let messenger: FlutterBinaryMessenger = registry.registrar(forPlugin: "GleanICloud")!
       .messenger()
     let channel = FlutterMethodChannel(
       name: "glean/icloud", binaryMessenger: messenger)
