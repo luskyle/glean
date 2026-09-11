@@ -1,9 +1,10 @@
 /**
- * Service Worker（简洁版）：
+ * Service Worker（简洁版，V2「万物皆可轻松收藏」）：
  * - 右键「收藏到 Glean」→ 子菜单：选分类后收藏… / 收藏当前网页 / 各分类直达
- * - 菜单上下文：selection（划词）与 page（网页）分别提供对应入口
- * - 菜单在 SW 启动 / 扩展安装更新 / 弹窗打开时重建；
- *   分类列表来自云端快照（popup 刷新后生效）
+ * - 右键「图片收藏到 Glean」（contexts: image）：图片引用必存，原图尝试下载到媒体库
+ * - 划词收藏：经 content script 取选区 HTML，随条目存 htmlClip（文本 + 快照）
+ * - 整页收藏：fetch 页面抓 description / og:image 补充元数据（失败静默降级）
+ * - 菜单在 SW 启动 / 扩展安装更新 / 弹窗打开时重建；分类列表来自云端快照
  * - 写入 WebDAV 后 ping 桌面端 → 即时同步
  */
 importScripts('snapshot.js');
@@ -42,6 +43,12 @@ async function rebuildMenus() {
       type: 'separator',
       contexts: ['selection', 'page'],
     });
+    // 图片独立入口（不挂在根菜单下：contexts 不同）
+    chrome.contextMenus.create({
+      id: 'glean-save-image',
+      title: '图片收藏到 Glean',
+      contexts: ['image'],
+    });
     // 云端分类直达：划词收藏到分类 / 网页收藏到分类 两组
     (async () => {
       let cols = await fetchCollections();
@@ -66,11 +73,53 @@ async function rebuildMenus() {
   });
 }
 
+/** 从内容脚本取最近选区 HTML；文本不一致时丢弃（防御旧选区）。失败返回空。 */
+async function fetchSelectionHtml(tab, text) {
+  if (!tab?.id) return '';
+  try {
+    const r = await chrome.tabs.sendMessage(tab.id, { getSelection: true });
+    if (r && r.text === text && r.html) return r.html;
+    return '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/** 抓取页面元数据（description / og:image）；跨域或解析失败返回 null（静默降级）。 */
+async function fetchPageMeta(url) {
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const grab = (pattern) => {
+      const m = html.match(pattern);
+      return m ? m[1].slice(0, 500) : null;
+    };
+    const description = grab(
+      /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
+      grab(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i);
+    const coverUrl = grab(
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+    if (!description && !coverUrl) return null;
+    return { description, coverUrl };
+  } catch (_) {
+    return null;
+  }
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const url = tab?.url || '';
   const title = tab?.title || '';
 
-  // ---- 网页收藏（无划词文本；prompt 存页面标题，answer 存 URL）----
+  // ---- 图片收藏（右键图片 → 引用 + 尽力下载原图）----
+  if (info.menuItemId === 'glean-save-image') {
+    const imgUrl = info.srcUrl || '';
+    const ok = await saveImageWith(imgUrl, url, title, null);
+    notify(ok ? '已收藏图片' : '收藏失败：请先在弹窗配置 WebDAV');
+    return;
+  }
+
+  // ---- 网页收藏（无划词文本；内容 = 页面标题）----
   if (typeof info.menuItemId === 'string' &&
       info.menuItemId.startsWith('page-col-')) {
     const collectionId = parseInt(info.menuItemId.slice('page-col-'.length), 10) || null;
@@ -82,11 +131,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // ---- 划词收藏 ----
   const text = (info.selectionText || '').trim();
   if (!text) return;
+  const selHtml = await fetchSelectionHtml(tab, text);
 
   if (info.menuItemId === 'glean-with-cat') {
     // openPopup 必须在用户手势同步上下文：storage.set 不 await
     chrome.storage.local.set({
       pendingText: text,
+      pendingHtml: selHtml,
       pendingUrl: url,
       pendingTitle: title,
     });
@@ -95,19 +146,19 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   if (typeof info.menuItemId === 'string' && info.menuItemId.startsWith('col-')) {
     const collectionId = parseInt(info.menuItemId.slice(4), 10) || null;
-    const ok = await saveWith(text, url, title, collectionId);
+    const ok = await saveWith(text, url, title, collectionId, selHtml);
     notify(ok ? '已收藏到所选分类' : '收藏失败：请先在弹窗配置 WebDAV');
   }
 });
 
-/** 收藏（带可选分类与来源页标题），写入云端成功后通知桌面端实时同步。 */
-async function saveWith(text, url, title, collectionId) {
+/** 收藏划词（含选区 HTML 快照），写入云端成功后通知桌面端实时同步。 */
+async function saveWith(text, url, title, collectionId, htmlClip) {
   try {
     const cfg = await loadConfig();
     if (!cfg.url) return false;
     const snap = (await davGet(cfg)) || emptySnapshot();
     if (!snap.rows) snap.rows = {};
-    appendItem(snap, text, { url, title, collectionId });
+    appendItem(snap, text, { url, title, collectionId, htmlClip });
     await davPut(cfg, snap); // davPut 内部会 pingDesktop
     return true;
   } catch (e) {
@@ -116,7 +167,7 @@ async function saveWith(text, url, title, collectionId) {
   }
 }
 
-/** 收藏当前网页：卡面 prompt=页面标题，answer=URL，originalUrl/sourceTitle 同源。 */
+/** 收藏当前网页：内容 = 页面标题，附 description / og:image 元数据（尽力而为）。 */
 async function savePageWith(url, title, collectionId) {
   if (!url) return false;
   try {
@@ -124,11 +175,61 @@ async function savePageWith(url, title, collectionId) {
     if (!cfg.url) return false;
     const snap = (await davGet(cfg)) || emptySnapshot();
     if (!snap.rows) snap.rows = {};
-    appendItem(snap, title || url, { url, title, collectionId });
+    const meta = await fetchPageMeta(url);
+    appendItem(snap, title || url, {
+      url,
+      title,
+      collectionId,
+      note: meta?.description || null,
+      coverUrl: meta?.coverUrl || null,
+    });
     await davPut(cfg, snap);
     return true;
   } catch (e) {
     console.error('glean save page failed', e);
+    return false;
+  }
+}
+
+/**
+ * 收藏图片：引用（originalUrl=图片 URL）必存；
+ * 原图尝试下载到 WebDAV 媒体库（mediaPath），任何失败静默降级为纯引用。
+ */
+async function saveImageWith(imgUrl, pageUrl, pageTitle, collectionId) {
+  if (!imgUrl || !/^https?:\/\//i.test(imgUrl)) return false;
+  try {
+    const cfg = await loadConfig();
+    if (!cfg.url) return false;
+    const snap = (await davGet(cfg)) || emptySnapshot();
+    if (!snap.rows) snap.rows = {};
+
+    // 尽力下载原图（跨域/防盗链失败 → mediaPath=null，仅留引用）
+    let mediaPath = null;
+    try {
+      const res = await fetch(imgUrl, { cache: 'no-store' });
+      if (res.ok) {
+        const blob = await res.blob();
+        const rawExt = (blob.type.split('/')[1] || 'jpg')
+          .replace(/[^a-z0-9]/gi, '').slice(0, 5);
+        const ext = rawExt || 'jpg';
+        mediaPath = await davPutBinary(cfg, blob, ext);
+      }
+    } catch (_) {
+      mediaPath = null;
+    }
+
+    appendItem(snap, pageTitle || imgUrl, {
+      url: imgUrl,
+      title: pageTitle,
+      collectionId,
+      mediaType: 'image',
+      mediaPath,
+      source: 'image',
+    });
+    await davPut(cfg, snap); // davPut 内部会 pingDesktop
+    return true;
+  } catch (e) {
+    console.error('glean image save failed', e);
     return false;
   }
 }

@@ -1,8 +1,10 @@
 /**
- * WebDAV 读写（快照契约：glean/backup.json）。
+ * WebDAV 读写（快照契约：glean/backup.json；媒体文件库：glean/media/）。
  * 与 Glean App 的云盘同步共用同一份 JSON——插件收藏即被各端合并入库。
+ * 条目上新增的字段（htmlClip/mediaType/mediaPath/coverUrl）App 旧版白名单忽略。
  */
 const REMOTE_PATH = '/glean/backup.json';
+const MEDIA_DIR = '/glean/media';
 
 async function loadConfig() {
   const cfg = await chrome.storage.local.get(['davUrl', 'davUser', 'davPass']);
@@ -23,6 +25,33 @@ async function davGet(cfg) {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`读取云端失败（HTTP ${res.status}）`);
   return res.json();
+}
+
+/** 确保媒体目录存在（MKCOL，已存在时忽略错误）。 */
+async function ensureMediaDir(cfg) {
+  try {
+    await fetch(cfg.url + MEDIA_DIR, { method: 'MKCOL' });
+  } catch (_) {}
+}
+
+/** 上传媒体文件（二进制）到 media/，返回相对路径；失败返回 null（调用方降级引用）。 */
+async function davPutBinary(cfg, blob, ext) {
+  try {
+    await ensureMediaDir(cfg);
+    const name = `${nextId()}.${ext}`;
+    const res = await fetch(cfg.url + MEDIA_DIR + '/' + name, {
+      method: 'PUT',
+      headers: {
+        ...authHeaders(cfg),
+        'Content-Type': blob.type || 'application/octet-stream',
+      },
+      body: blob,
+    });
+    if (!res.ok) return null;
+    return `${MEDIA_DIR}/${name}`;
+  } catch (_) {
+    return null;
+  }
 }
 
 async function davPut(cfg, payload) {
@@ -66,8 +95,12 @@ function guessLang(text) {
  * 追加一条收藏（进收件箱：status=inbox，与 App 收件箱对应）。
  * 返回新的快照（在传入 rows 上原地追加并返回引用）。
  * 不生成 cards/review_logs 段（Glean 无对应表，App 合并时忽略）。
+ * 可选 V2 字段：htmlClip（选区 HTML）、mediaType/mediaPath（媒体）、coverUrl（封面）。
  */
-function appendItem(snapshot, text, { url, title, note, collectionId }) {
+function appendItem(snapshot, text, {
+  url, title, note, collectionId,
+  htmlClip, mediaType, mediaPath, coverUrl, source = 'browser',
+} = {}) {
   const rows = snapshot.rows;
   rows.items = rows.items || [];
   rows.item_collections = rows.item_collections || [];
@@ -75,10 +108,10 @@ function appendItem(snapshot, text, { url, title, note, collectionId }) {
   const now = new Date().toISOString();
   const itemId = nextId();
 
-  rows.items.push({
+  const row = {
     id: itemId,
-    source: 'browser',
-    mediaPath: null,
+    source,
+    mediaPath: mediaPath || null,
     originalUrl: url || null,
     mediaAssetId: null,
     sourceTitle: title || null,
@@ -86,7 +119,13 @@ function appendItem(snapshot, text, { url, title, note, collectionId }) {
     lang: guessLang(text),
     status: 'inbox',
     createdAt: now,
-  });
+  };
+  if (htmlClip) row.htmlClip = htmlClip;
+  if (mediaType) row.mediaType = mediaType;
+  if (mediaPath) row.mediaType = row.mediaType || 'file';
+  if (coverUrl) row.coverUrl = coverUrl;
+  rows.items.push(row);
+
   if (collectionId) {
     rows.item_collections.push({ itemId, collectionId, isPrimary: true });
   }

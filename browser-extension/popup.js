@@ -62,11 +62,12 @@ async function saveSelection() {
       snap.rows.collections = lastCollections;
     }
     const collectionId = parseInt($('collection').value, 10) || null;
-    // 进收件箱（带来源页标题）
+    // 进收件箱（带来源页标题 + 选区 HTML 快照）
     appendItem(snap, text, {
       url: $('pageUrl').value || null,
       title: $('pageTitle').value || null,
       collectionId,
+      htmlClip: _pendingHtml || '',
     });
     await davPut(cfg, snap);
     setMsg('已收藏 ✓', true);
@@ -86,27 +87,34 @@ function setMsg(t, ok) {
 // 划选文本带入：background 收到右键收藏前先把选区存起来。
 // storage.set 为异步，popup 打开即读可能取不到——重试最多 500ms。
 let _pendingTries = 0;
+let _pendingHtml = '';
 function takePendingText() {
-  chrome.storage.local.get(['pendingText', 'pendingUrl', 'pendingTitle'], (r) => {
-    if (r.pendingText || _pendingTries >= 10) {
-      if (r.pendingText) {
-        $('text').value = r.pendingText;
-        $('pageUrl').value = r.pendingUrl || '';
-        $('pageTitle').value = r.pendingTitle || '';
-        const src = $('sourceLine');
-        if (src) {
-          src.textContent = r.pendingTitle
-            ? '来自：' + r.pendingTitle
-            : (r.pendingUrl ? '来自：' + r.pendingUrl : '');
-          src.style.display = (r.pendingTitle || r.pendingUrl) ? '' : 'none';
+  chrome.storage.local.get(
+    ['pendingText', 'pendingUrl', 'pendingTitle', 'pendingHtml'],
+    (r) => {
+      if (r.pendingText || _pendingTries >= 10) {
+        if (r.pendingText) {
+          $('text').value = r.pendingText;
+          _pendingHtml = r.pendingHtml || '';
+          $('pageUrl').value = r.pendingUrl || '';
+          $('pageTitle').value = r.pendingTitle || '';
+          const src = $('sourceLine');
+          if (src) {
+            src.textContent = r.pendingTitle
+              ? '来自：' + r.pendingTitle
+              : (r.pendingUrl ? '来自：' + r.pendingUrl : '');
+            src.style.display = (r.pendingTitle || r.pendingUrl) ? '' : 'none';
+          }
+          chrome.storage.local.remove(
+            ['pendingText', 'pendingUrl', 'pendingTitle', 'pendingHtml'],
+          );
         }
-        chrome.storage.local.remove(['pendingText', 'pendingUrl', 'pendingTitle']);
+        return;
       }
-      return;
-    }
-    _pendingTries += 1;
-    setTimeout(takePendingText, 50);
-  });
+      _pendingTries += 1;
+      setTimeout(takePendingText, 50);
+    },
+  );
 }
 takePendingText();
 
