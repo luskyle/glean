@@ -20,6 +20,9 @@ class SettingsScreen extends ConsumerWidget {
           // ---- 云盘备份（B 档）----
           const CloudBackupSection(),
           const SizedBox(height: 12),
+          // ---- 云盘媒体维护（浏览器直传，仅 WebDAV 通道）----
+          const _MediaMaintenanceCard(),
+          const SizedBox(height: 12),
           // ---- 偏好 ----
           Card(
             child: Column(
@@ -132,4 +135,123 @@ class SettingsScreen extends ConsumerWidget {
         ThemeMode.dark => '深色',
         _ => '跟随系统',
       };
+}
+
+/// 云盘媒体维护（浏览器直传的 /glean/media/ 文件；仅 WebDAV 通道支持）。
+class _MediaMaintenanceCard extends ConsumerStatefulWidget {
+  const _MediaMaintenanceCard();
+
+  @override
+  ConsumerState<_MediaMaintenanceCard> createState() =>
+      _MediaMaintenanceCardState();
+}
+
+class _MediaMaintenanceCardState extends ConsumerState<_MediaMaintenanceCard> {
+  Map<String, int>? _files; // 文件名 -> 字节数
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    if (settings.syncChannel != 'webdav') return const SizedBox.shrink();
+
+    final totalBytes = (_files?.values ?? const []).fold<int>(0, (a, b) => a + b);
+    final summary = _files == null
+        ? '点击查看浏览器直传的媒体文件'
+        : '${_files!.length} 个文件 · ${_fmtSize(totalBytes)}';
+
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.cloud_outlined),
+            title: const Text('云盘媒体文件'),
+            subtitle: Text(_loading ? '统计中…' : summary),
+            trailing: const Icon(Icons.refresh),
+            onTap: _refresh,
+          ),
+          ListTile(
+            leading: const Icon(Icons.cleaning_services_outlined),
+            title: const Text('清理云盘孤儿文件'),
+            subtitle: const Text('删除条目已删但留在云盘的媒体文件'),
+            onTap: _cleanup,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmtSize(int bytes) {
+    if (bytes >= 1 << 20) {
+      return '${(bytes / (1 << 20)).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= 1 << 10) return '${(bytes / (1 << 10)).toStringAsFixed(0)} KB';
+    return '$bytes B';
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    final cloud = ref.read(syncServiceProvider).cloud;
+    final list = await cloud.listMedia();
+    if (!mounted) return;
+    setState(() {
+      _files = list;
+      _loading = false;
+    });
+  }
+
+  Future<void> _cleanup() async {
+    final cloud = ref.read(syncServiceProvider).cloud;
+    final list = await cloud.listMedia();
+    if (list.isEmpty) {
+      _snack('媒体目录为空');
+      return;
+    }
+
+    // 云盘文件名 vs 本地条目路径引用（取尾部文件名）
+    final db = ref.read(databaseProvider);
+    final items = await db.select(db.items).get();
+    final used = items
+        .map((i) => i.mediaPath?.split('/').last)
+        .whereType<String>()
+        .toSet();
+    final orphans = list.keys.where((n) => !used.contains(n)).toList();
+    if (orphans.isEmpty) {
+      _snack('没有未引用的孤儿文件');
+      return;
+    }
+    if (!mounted) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('清理 ${orphans.length} 个孤儿文件？'),
+        content: const Text('这些文件在云盘 /glean/media/ 下，但没有对应的收藏条目引用。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('清理'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    var deleted = 0;
+    for (final n in orphans) {
+      if (await cloud.deleteMedia('/glean/media/$n')) deleted++;
+    }
+    if (!mounted) return;
+    _snack('已清理 $deleted 个孤儿文件');
+    await _refresh();
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
 }

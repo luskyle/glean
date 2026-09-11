@@ -33,5 +33,14 @@
       sendResponse(latest);
       latest = { text: '', html: '' };
     }
+    if (msg && msg.getImages) {
+      // 批量收藏：收集页面可见图片（去重，上限 30）
+      const urls = [];
+      document.querySelectorAll('img').forEach((img) => {
+        const u = img.currentSrc || img.src || '';
+        if (u && urls.length < 30 && !urls.includes(u)) urls.push(u);
+      });
+      sendResponse(urls);
+    }
   });
 })();

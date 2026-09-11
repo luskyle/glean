@@ -73,6 +73,12 @@ async function rebuildMenus() {
       title: '整页离线收藏到 Glean',
       contexts: ['page'],
     });
+    // V2：批量收藏页面全部图片（引用）
+    chrome.contextMenus.create({
+      id: 'glean-page-images',
+      title: '批量收藏页面图片',
+      contexts: ['page'],
+    });
     // 云端分类直达：划词收藏到分类 / 网页收藏到分类 两组
     (async () => {
       let cols = await fetchCollections();
@@ -165,6 +171,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // ---- 整页离线收藏（V2：单文件 HTML + 静态资源内联）----
   if (info.menuItemId === 'glean-offline-page') {
     const r = await savePageOffline(url, title, null);
+    notify(r.ok ? r.msg : (r.msg || '收藏失败：请先在弹窗配置 WebDAV'), r.ok);
+    return;
+  }
+
+  // ---- 批量收藏页面图片（V2：引用模式，一次收集 ≤30 张）----
+  if (info.menuItemId === 'glean-page-images') {
+    const r = await savePageImages(url, title, null, tab);
     notify(r.ok ? r.msg : (r.msg || '收藏失败：请先在弹窗配置 WebDAV'), r.ok);
     return;
   }
@@ -517,6 +530,47 @@ async function savePageOffline(url, title, collectionId) {
   } catch (e) {
     console.error('glean offline save failed', e);
     return { ok: false };
+  }
+}
+
+/**
+ * 批量收藏页面图片（引用模式，一次 ≤30 张）：
+ * content script 收集页面 img（currentSrc 优先）→ 每条一个条目，一次快照写入。
+ */
+async function savePageImages(pageUrl, pageTitle, collectionId, tab) {
+  try {
+    const cfg = await loadConfig();
+    if (!cfg.url) return { ok: false };
+    const urls = await collectPageImages(tab);
+    if (!urls || urls.length === 0) {
+      return { ok: false, msg: '页面上没有发现图片' };
+    }
+    const snap = (await davGet(cfg)) || emptySnapshot();
+    if (!snap.rows) snap.rows = {};
+    for (const u of urls) {
+      appendItem(snap, pageTitle || u, {
+        url: u,
+        title: pageTitle,
+        collectionId,
+        mediaType: 'image',
+        source: 'image',
+      });
+    }
+    await davPut(cfg, snap); // davPut 内部会 pingDesktop
+    return { ok: true, msg: `已收藏 ${urls.length} 张图片（引用）` };
+  } catch (e) {
+    console.error('glean page images failed', e);
+    return { ok: false };
+  }
+}
+
+/** 从内容脚本收集页面图片 URL（失败返回空数组）。 */
+async function collectPageImages(tab) {
+  if (!tab?.id) return [];
+  try {
+    return (await chrome.tabs.sendMessage(tab.id, { getImages: true })) || [];
+  } catch (_) {
+    return [];
   }
 }
 

@@ -238,4 +238,27 @@ void main() {
     expect(merged.mediaType, 'image');
     expect(merged.coverUrl, 'https://example.com/cover.jpg');
   });
+
+  test('媒体文件接口（LocalDrive）：读取 / 列出 / 删除', () async {
+    backupDir = await Directory.systemTemp.createTemp('media_drive');
+    addTearDown(() => backupDir.delete(recursive: true));
+    final drive = LocalDrive(backupDir);
+
+    // 模拟浏览器直传：云盘 media 目录里有一个文件
+    final mediaDir = Directory('${backupDir.path}/media');
+    await mediaDir.create(recursive: true);
+    await File('${mediaDir.path}/-1234.jpg').writeAsBytes([1, 2, 3]);
+
+    expect(await drive.readMedia('/glean/media/-1234.jpg'), isNotNull);
+    expect((await drive.readMedia('/glean/media/-1234.jpg'))!.length, 3);
+    expect(await drive.readMedia('/glean/media/missing.png'), isNull);
+
+    final list = await drive.listMedia();
+    expect(list, contains('-1234.jpg'));
+    expect(list['-1234.jpg'], 3);
+
+    expect(await drive.deleteMedia('/glean/media/-1234.jpg'), isTrue);
+    expect(await drive.readMedia('/glean/media/-1234.jpg'), isNull);
+    expect(await drive.deleteMedia('/glean/media/-1234.jpg'), isFalse);
+  });
 }

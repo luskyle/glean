@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
@@ -194,6 +198,11 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
                   ),
                 ],
               ),
+            ],
+            // 媒体文件（浏览器直传）：下载到本地并用系统默认应用打开
+            if (item.mediaPath != null && item.mediaType != null) ...[
+              const SizedBox(height: 12),
+              _OpenMediaButton(item: item),
             ],
             const SizedBox(height: 16),
             TextField(
@@ -389,5 +398,80 @@ class _HtmlClipView extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// 媒体文件操作：从云盘下载到本地临时目录，再用系统默认应用打开。
+class _OpenMediaButton extends ConsumerWidget {
+  const _OpenMediaButton({required this.item});
+
+  final ItemRow item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        FilledButton.tonalIcon(
+          onPressed: () => _openMedia(context, ref),
+          icon: const Icon(Icons.download_outlined, size: 18),
+          label: Text(_typeLabel()),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            item.mediaPath!,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _typeLabel() => switch (item.mediaType) {
+        'html' => '打开离线页面',
+        'image' => '打开图片',
+        'video' => '打开视频',
+        'audio' => '打开音频',
+        _ => '打开文件',
+      };
+
+  Future<void> _openMedia(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final cloud = ref.read(syncServiceProvider).cloud;
+    final path = item.mediaPath!;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(const SnackBar(content: Text('正在从云盘下载…')));
+
+    final bytes = await cloud.readMedia(path);
+    if (bytes == null) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('下载失败：媒体通道不可用或文件不存在')),
+      );
+      return;
+    }
+    try {
+      final tmp = await getTemporaryDirectory();
+      final dir = Directory(p.join(tmp.path, 'glean_media'));
+      await dir.create(recursive: true);
+      final file = File(p.join(dir.path, path.split('/').last));
+      await file.writeAsBytes(bytes);
+      final ok = await launchUrl(
+        Uri.file(file.path),
+        mode: LaunchMode.externalApplication,
+      );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            ok ? '已打开：${file.path}' : '打开失败，文件已保存到：${file.path}',
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text('打开失败：$e')));
+    }
   }
 }

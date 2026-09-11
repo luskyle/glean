@@ -24,6 +24,15 @@ abstract class CloudDrive {
 
   /// 读取最新备份；无备份时返回 null。
   Future<String?> download();
+
+  /// 读取媒体文件字节（浏览器直传的 /glean/media/ 文件）；不支持返回 null。
+  Future<Uint8List?> readMedia(String path);
+
+  /// 媒体目录清单（路径 → 字节数）；不支持返回空。
+  Future<Map<String, int>> listMedia();
+
+  /// 删除媒体文件；失败返回 false。
+  Future<bool> deleteMedia(String path);
 }
 
 const _icloudChannel = MethodChannel('glean/icloud');
@@ -59,6 +68,16 @@ class ICloudDriveAdapter implements CloudDrive {
   Future<String?> download() async {
     return _icloudChannel.invokeMethod<String>('download');
   }
+
+  // iCloud 通道仅承载 backup.json 快照；媒体文件不支持（浏览器插件走 WebDAV）。
+  @override
+  Future<Uint8List?> readMedia(String path) async => null;
+
+  @override
+  Future<Map<String, int>> listMedia() async => const {};
+
+  @override
+  Future<bool> deleteMedia(String path) async => false;
 }
 
 /// WebDAV 适配器（坚果云等：免费 1GB 起）。
@@ -129,6 +148,46 @@ class WebDavAdapter implements CloudDrive {
       return null;
     }
   }
+
+  // ---- 媒体文件（浏览器直传的 /glean/media/）----
+
+  @override
+  Future<Uint8List?> readMedia(String path) async {
+    final c = await _ensure();
+    if (c == null) return null;
+    try {
+      return Uint8List.fromList(await c.read(path));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<Map<String, int>> listMedia() async {
+    final c = await _ensure();
+    if (c == null) return const {};
+    try {
+      final dir = await c.readDir('/glean/media');
+      return {
+        for (final f in dir)
+          if (f.isDir != true && f.name != null) f.name!: (f.size ?? 0),
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  @override
+  Future<bool> deleteMedia(String path) async {
+    final c = await _ensure();
+    if (c == null) return false;
+    try {
+      await c.remove(path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 /// 本地目录模拟（测试 / 桌面本地演示）。
@@ -160,5 +219,41 @@ class LocalDrive implements CloudDrive {
   Future<String?> download() async {
     final f = await _file();
     return f.existsSync() ? f.readAsString() : null;
+  }
+
+  // ---- 本地模拟媒体目录（<dir>/media/）----
+
+  Future<io.File> _mediaFile(String path) async {
+    await directory.create(recursive: true);
+    // 去掉开头的 /glean/media/ 或 / 前缀，落在 <dir>/media/ 下
+    final name = path.split('/').last;
+    final mediaDir = io.Directory('${directory.path}/media');
+    await mediaDir.create(recursive: true);
+    return io.File('${mediaDir.path}/$name');
+  }
+
+  @override
+  Future<Uint8List?> readMedia(String path) async {
+    final f = await _mediaFile(path);
+    return f.existsSync() ? f.readAsBytes() : null;
+  }
+
+  @override
+  Future<Map<String, int>> listMedia() async {
+    final dir = io.Directory('${directory.path}/media');
+    if (!await dir.exists()) return const {};
+    final entries = await dir.list().toList();
+    return {
+      for (final e in entries)
+        if (e is io.File) e.uri.pathSegments.last: await e.length(),
+    };
+  }
+
+  @override
+  Future<bool> deleteMedia(String path) async {
+    final f = await _mediaFile(path);
+    if (!f.existsSync()) return false;
+    await f.delete();
+    return true;
   }
 }
