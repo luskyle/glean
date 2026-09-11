@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -161,6 +162,25 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
               const SizedBox(height: 12),
               _SourceRow(item: item),
             ],
+            // 封面（视频/音频/网页收藏的 og:image 引用）
+            if (item.coverUrl != null && item.coverUrl!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  item.coverUrl!,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ],
+            // 浏览器选区 HTML 快照（只读渲染，flutter_html 不执行脚本）
+            if (item.htmlClip != null && item.htmlClip!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _HtmlClipView(html: item.htmlClip!),
+            ],
             const SizedBox(height: 16),
             TextField(
               controller: _note,
@@ -258,6 +278,10 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
       'browser' => '浏览器',
       'share' => '分享',
       'photo' => '照片',
+      'image' => '图片',
+      'video' => '视频',
+      'audio' => '音频',
+      'file' => '文件',
       'manual' => '手动',
       'word' => '词条',
       'quote' => '语录',
@@ -316,6 +340,34 @@ class _SourceRow extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 选区 HTML 快照（只读渲染；flutter_html 不执行脚本，避免 XSS）。
+class _HtmlClipView extends StatelessWidget {
+  const _HtmlClipView({required this.html});
+
+  final String html;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('选区快照', style: Theme.of(context).textTheme.labelMedium),
+          const SizedBox(height: 8),
+          Html(data: html),
         ],
       ),
     );

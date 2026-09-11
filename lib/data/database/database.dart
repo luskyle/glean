@@ -6,7 +6,7 @@ import 'tables.dart';
 
 part 'database.g.dart';
 
-const kSchemaVersion = 5;
+const kSchemaVersion = 6;
 
 /// Glean 收藏库（drift/SQLite）。
 ///
@@ -43,6 +43,11 @@ class AppDatabase extends _$AppDatabase {
           await _seedSystemCollections();
         },
         onUpgrade: (m, from, to) async {
+          if (from < 6) {
+            await m.addColumn(items, items.htmlClip);
+            await m.addColumn(items, items.mediaType);
+            await m.addColumn(items, items.coverUrl);
+          }
           if (from < 5) {
             await m.createTable(mediaFolders);
             await m.addColumn(mediaAssets, mediaAssets.folderId);

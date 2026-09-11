@@ -16,6 +16,15 @@ class Items extends Table {
   /// 网页摘录来源页标题（Phase 1：划词收藏自动带出处）
   TextColumn get sourceTitle => text().nullable()();
 
+  /// 浏览器选区 HTML 快照（V1.1：划词收藏带入，App 只读渲染不执行脚本）
+  TextColumn get htmlClip => text().nullable()();
+
+  /// 媒体类型：image | video | audio | file（V1.1 浏览器端收藏直传）
+  TextColumn get mediaType => text().nullable()();
+
+  /// 封面/引用图 URL（og:image，网页 / 视频 / 音频收藏）
+  TextColumn get coverUrl => text().nullable()();
+
   /// 用户备注（为什么收）
   TextColumn get note => text().nullable()();
 

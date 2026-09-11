@@ -205,4 +205,37 @@ void main() {
     expect(aCount, bCount);
     expect(aCount, greaterThanOrEqualTo(2)); // A 1 条 + B 1 条 = 2
   });
+
+  test('V1.1 浏览器字段：htmlClip/mediaType/coverUrl 快照往返保留', () async {
+    backupDir = await Directory.systemTemp.createTemp('snap_v11');
+    addTearDown(() => backupDir.delete(recursive: true));
+    final svc = SyncService(db: db, cloud: LocalDrive(backupDir));
+
+    // 浏览器式条目：选区 HTML / 媒体类型 / 封面
+    final now = DateTime(2026, 9, 1, 10);
+    final itemId = await db.into(db.items).insert(
+          ItemsCompanion.insert(
+            source: const drift.Value('image'),
+            originalUrl: const drift.Value('https://example.com/photo.jpg'),
+            sourceTitle: const drift.Value('示例图片页'),
+            htmlClip: const drift.Value('<b>选区</b>'),
+            mediaType: const drift.Value('image'),
+            coverUrl: const drift.Value('https://example.com/cover.jpg'),
+            note: const drift.Value('页面图片'),
+            lang: const drift.Value('zh'),
+            createdAt: now,
+          ),
+        );
+    await svc.backup();
+
+    // 恢复：新字段原样回到本地
+    await db.delete(db.items).go();
+    expect(await svc.restore(), isNull);
+    final merged = await (db.select(db.items)
+          ..where((t) => t.id.equals(itemId)))
+        .getSingle();
+    expect(merged.htmlClip, '<b>选区</b>');
+    expect(merged.mediaType, 'image');
+    expect(merged.coverUrl, 'https://example.com/cover.jpg');
+  });
 }

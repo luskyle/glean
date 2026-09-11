@@ -48,6 +48,24 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemRow> {
   late final GeneratedColumn<String> sourceTitle = GeneratedColumn<String>(
       'source_title', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _htmlClipMeta =
+      const VerificationMeta('htmlClip');
+  @override
+  late final GeneratedColumn<String> htmlClip = GeneratedColumn<String>(
+      'html_clip', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _mediaTypeMeta =
+      const VerificationMeta('mediaType');
+  @override
+  late final GeneratedColumn<String> mediaType = GeneratedColumn<String>(
+      'media_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _coverUrlMeta =
+      const VerificationMeta('coverUrl');
+  @override
+  late final GeneratedColumn<String> coverUrl = GeneratedColumn<String>(
+      'cover_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
   late final GeneratedColumn<String> note = GeneratedColumn<String>(
@@ -79,6 +97,9 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemRow> {
         originalUrl,
         mediaAssetId,
         sourceTitle,
+        htmlClip,
+        mediaType,
+        coverUrl,
         note,
         lang,
         status,
@@ -123,6 +144,18 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemRow> {
           sourceTitle.isAcceptableOrUnknown(
               data['source_title']!, _sourceTitleMeta));
     }
+    if (data.containsKey('html_clip')) {
+      context.handle(_htmlClipMeta,
+          htmlClip.isAcceptableOrUnknown(data['html_clip']!, _htmlClipMeta));
+    }
+    if (data.containsKey('media_type')) {
+      context.handle(_mediaTypeMeta,
+          mediaType.isAcceptableOrUnknown(data['media_type']!, _mediaTypeMeta));
+    }
+    if (data.containsKey('cover_url')) {
+      context.handle(_coverUrlMeta,
+          coverUrl.isAcceptableOrUnknown(data['cover_url']!, _coverUrlMeta));
+    }
     if (data.containsKey('note')) {
       context.handle(
           _noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
@@ -162,6 +195,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemRow> {
           .read(DriftSqlType.int, data['${effectivePrefix}media_asset_id']),
       sourceTitle: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}source_title']),
+      htmlClip: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}html_clip']),
+      mediaType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}media_type']),
+      coverUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cover_url']),
       note: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}note']),
       lang: attachedDatabase.typeMapping
@@ -193,6 +232,15 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
   /// 网页摘录来源页标题（Phase 1：划词收藏自动带出处）
   final String? sourceTitle;
 
+  /// 浏览器选区 HTML 快照（V1.1：划词收藏带入，App 只读渲染不执行脚本）
+  final String? htmlClip;
+
+  /// 媒体类型：image | video | audio | file（V1.1 浏览器端收藏直传）
+  final String? mediaType;
+
+  /// 封面/引用图 URL（og:image，网页 / 视频 / 音频收藏）
+  final String? coverUrl;
+
   /// 用户备注（为什么收）
   final String? note;
 
@@ -209,6 +257,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
       this.originalUrl,
       this.mediaAssetId,
       this.sourceTitle,
+      this.htmlClip,
+      this.mediaType,
+      this.coverUrl,
       this.note,
       this.lang,
       required this.status,
@@ -229,6 +280,15 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
     }
     if (!nullToAbsent || sourceTitle != null) {
       map['source_title'] = Variable<String>(sourceTitle);
+    }
+    if (!nullToAbsent || htmlClip != null) {
+      map['html_clip'] = Variable<String>(htmlClip);
+    }
+    if (!nullToAbsent || mediaType != null) {
+      map['media_type'] = Variable<String>(mediaType);
+    }
+    if (!nullToAbsent || coverUrl != null) {
+      map['cover_url'] = Variable<String>(coverUrl);
     }
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
@@ -257,6 +317,15 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
       sourceTitle: sourceTitle == null && nullToAbsent
           ? const Value.absent()
           : Value(sourceTitle),
+      htmlClip: htmlClip == null && nullToAbsent
+          ? const Value.absent()
+          : Value(htmlClip),
+      mediaType: mediaType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mediaType),
+      coverUrl: coverUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverUrl),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       lang: lang == null && nullToAbsent ? const Value.absent() : Value(lang),
       status: Value(status),
@@ -274,6 +343,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
       originalUrl: serializer.fromJson<String?>(json['originalUrl']),
       mediaAssetId: serializer.fromJson<int?>(json['mediaAssetId']),
       sourceTitle: serializer.fromJson<String?>(json['sourceTitle']),
+      htmlClip: serializer.fromJson<String?>(json['htmlClip']),
+      mediaType: serializer.fromJson<String?>(json['mediaType']),
+      coverUrl: serializer.fromJson<String?>(json['coverUrl']),
       note: serializer.fromJson<String?>(json['note']),
       lang: serializer.fromJson<String?>(json['lang']),
       status: serializer.fromJson<String>(json['status']),
@@ -290,6 +362,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
       'originalUrl': serializer.toJson<String?>(originalUrl),
       'mediaAssetId': serializer.toJson<int?>(mediaAssetId),
       'sourceTitle': serializer.toJson<String?>(sourceTitle),
+      'htmlClip': serializer.toJson<String?>(htmlClip),
+      'mediaType': serializer.toJson<String?>(mediaType),
+      'coverUrl': serializer.toJson<String?>(coverUrl),
       'note': serializer.toJson<String?>(note),
       'lang': serializer.toJson<String?>(lang),
       'status': serializer.toJson<String>(status),
@@ -304,6 +379,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
           Value<String?> originalUrl = const Value.absent(),
           Value<int?> mediaAssetId = const Value.absent(),
           Value<String?> sourceTitle = const Value.absent(),
+          Value<String?> htmlClip = const Value.absent(),
+          Value<String?> mediaType = const Value.absent(),
+          Value<String?> coverUrl = const Value.absent(),
           Value<String?> note = const Value.absent(),
           Value<String?> lang = const Value.absent(),
           String? status,
@@ -316,6 +394,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
         mediaAssetId:
             mediaAssetId.present ? mediaAssetId.value : this.mediaAssetId,
         sourceTitle: sourceTitle.present ? sourceTitle.value : this.sourceTitle,
+        htmlClip: htmlClip.present ? htmlClip.value : this.htmlClip,
+        mediaType: mediaType.present ? mediaType.value : this.mediaType,
+        coverUrl: coverUrl.present ? coverUrl.value : this.coverUrl,
         note: note.present ? note.value : this.note,
         lang: lang.present ? lang.value : this.lang,
         status: status ?? this.status,
@@ -333,6 +414,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
           : this.mediaAssetId,
       sourceTitle:
           data.sourceTitle.present ? data.sourceTitle.value : this.sourceTitle,
+      htmlClip: data.htmlClip.present ? data.htmlClip.value : this.htmlClip,
+      mediaType: data.mediaType.present ? data.mediaType.value : this.mediaType,
+      coverUrl: data.coverUrl.present ? data.coverUrl.value : this.coverUrl,
       note: data.note.present ? data.note.value : this.note,
       lang: data.lang.present ? data.lang.value : this.lang,
       status: data.status.present ? data.status.value : this.status,
@@ -349,6 +433,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
           ..write('originalUrl: $originalUrl, ')
           ..write('mediaAssetId: $mediaAssetId, ')
           ..write('sourceTitle: $sourceTitle, ')
+          ..write('htmlClip: $htmlClip, ')
+          ..write('mediaType: $mediaType, ')
+          ..write('coverUrl: $coverUrl, ')
           ..write('note: $note, ')
           ..write('lang: $lang, ')
           ..write('status: $status, ')
@@ -358,8 +445,20 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
   }
 
   @override
-  int get hashCode => Object.hash(id, source, mediaPath, originalUrl,
-      mediaAssetId, sourceTitle, note, lang, status, createdAt);
+  int get hashCode => Object.hash(
+      id,
+      source,
+      mediaPath,
+      originalUrl,
+      mediaAssetId,
+      sourceTitle,
+      htmlClip,
+      mediaType,
+      coverUrl,
+      note,
+      lang,
+      status,
+      createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -370,6 +469,9 @@ class ItemRow extends DataClass implements Insertable<ItemRow> {
           other.originalUrl == this.originalUrl &&
           other.mediaAssetId == this.mediaAssetId &&
           other.sourceTitle == this.sourceTitle &&
+          other.htmlClip == this.htmlClip &&
+          other.mediaType == this.mediaType &&
+          other.coverUrl == this.coverUrl &&
           other.note == this.note &&
           other.lang == this.lang &&
           other.status == this.status &&
@@ -383,6 +485,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
   final Value<String?> originalUrl;
   final Value<int?> mediaAssetId;
   final Value<String?> sourceTitle;
+  final Value<String?> htmlClip;
+  final Value<String?> mediaType;
+  final Value<String?> coverUrl;
   final Value<String?> note;
   final Value<String?> lang;
   final Value<String> status;
@@ -394,6 +499,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
     this.originalUrl = const Value.absent(),
     this.mediaAssetId = const Value.absent(),
     this.sourceTitle = const Value.absent(),
+    this.htmlClip = const Value.absent(),
+    this.mediaType = const Value.absent(),
+    this.coverUrl = const Value.absent(),
     this.note = const Value.absent(),
     this.lang = const Value.absent(),
     this.status = const Value.absent(),
@@ -406,6 +514,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
     this.originalUrl = const Value.absent(),
     this.mediaAssetId = const Value.absent(),
     this.sourceTitle = const Value.absent(),
+    this.htmlClip = const Value.absent(),
+    this.mediaType = const Value.absent(),
+    this.coverUrl = const Value.absent(),
     this.note = const Value.absent(),
     this.lang = const Value.absent(),
     this.status = const Value.absent(),
@@ -418,6 +529,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
     Expression<String>? originalUrl,
     Expression<int>? mediaAssetId,
     Expression<String>? sourceTitle,
+    Expression<String>? htmlClip,
+    Expression<String>? mediaType,
+    Expression<String>? coverUrl,
     Expression<String>? note,
     Expression<String>? lang,
     Expression<String>? status,
@@ -430,6 +544,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
       if (originalUrl != null) 'original_url': originalUrl,
       if (mediaAssetId != null) 'media_asset_id': mediaAssetId,
       if (sourceTitle != null) 'source_title': sourceTitle,
+      if (htmlClip != null) 'html_clip': htmlClip,
+      if (mediaType != null) 'media_type': mediaType,
+      if (coverUrl != null) 'cover_url': coverUrl,
       if (note != null) 'note': note,
       if (lang != null) 'lang': lang,
       if (status != null) 'status': status,
@@ -444,6 +561,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
       Value<String?>? originalUrl,
       Value<int?>? mediaAssetId,
       Value<String?>? sourceTitle,
+      Value<String?>? htmlClip,
+      Value<String?>? mediaType,
+      Value<String?>? coverUrl,
       Value<String?>? note,
       Value<String?>? lang,
       Value<String>? status,
@@ -455,6 +575,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
       originalUrl: originalUrl ?? this.originalUrl,
       mediaAssetId: mediaAssetId ?? this.mediaAssetId,
       sourceTitle: sourceTitle ?? this.sourceTitle,
+      htmlClip: htmlClip ?? this.htmlClip,
+      mediaType: mediaType ?? this.mediaType,
+      coverUrl: coverUrl ?? this.coverUrl,
       note: note ?? this.note,
       lang: lang ?? this.lang,
       status: status ?? this.status,
@@ -483,6 +606,15 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
     if (sourceTitle.present) {
       map['source_title'] = Variable<String>(sourceTitle.value);
     }
+    if (htmlClip.present) {
+      map['html_clip'] = Variable<String>(htmlClip.value);
+    }
+    if (mediaType.present) {
+      map['media_type'] = Variable<String>(mediaType.value);
+    }
+    if (coverUrl.present) {
+      map['cover_url'] = Variable<String>(coverUrl.value);
+    }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
@@ -507,6 +639,9 @@ class ItemsCompanion extends UpdateCompanion<ItemRow> {
           ..write('originalUrl: $originalUrl, ')
           ..write('mediaAssetId: $mediaAssetId, ')
           ..write('sourceTitle: $sourceTitle, ')
+          ..write('htmlClip: $htmlClip, ')
+          ..write('mediaType: $mediaType, ')
+          ..write('coverUrl: $coverUrl, ')
           ..write('note: $note, ')
           ..write('lang: $lang, ')
           ..write('status: $status, ')
@@ -2316,6 +2451,9 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   Value<String?> originalUrl,
   Value<int?> mediaAssetId,
   Value<String?> sourceTitle,
+  Value<String?> htmlClip,
+  Value<String?> mediaType,
+  Value<String?> coverUrl,
   Value<String?> note,
   Value<String?> lang,
   Value<String> status,
@@ -2328,6 +2466,9 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<String?> originalUrl,
   Value<int?> mediaAssetId,
   Value<String?> sourceTitle,
+  Value<String?> htmlClip,
+  Value<String?> mediaType,
+  Value<String?> coverUrl,
   Value<String?> note,
   Value<String?> lang,
   Value<String> status,
@@ -2359,6 +2500,15 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<String> get sourceTitle => $composableBuilder(
       column: $table.sourceTitle, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get htmlClip => $composableBuilder(
+      column: $table.htmlClip, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get mediaType => $composableBuilder(
+      column: $table.mediaType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get coverUrl => $composableBuilder(
+      column: $table.coverUrl, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get note => $composableBuilder(
       column: $table.note, builder: (column) => ColumnFilters(column));
@@ -2401,6 +2551,15 @@ class $$ItemsTableOrderingComposer
   ColumnOrderings<String> get sourceTitle => $composableBuilder(
       column: $table.sourceTitle, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get htmlClip => $composableBuilder(
+      column: $table.htmlClip, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get mediaType => $composableBuilder(
+      column: $table.mediaType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get coverUrl => $composableBuilder(
+      column: $table.coverUrl, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get note => $composableBuilder(
       column: $table.note, builder: (column) => ColumnOrderings(column));
 
@@ -2440,6 +2599,15 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumn<String> get sourceTitle => $composableBuilder(
       column: $table.sourceTitle, builder: (column) => column);
+
+  GeneratedColumn<String> get htmlClip =>
+      $composableBuilder(column: $table.htmlClip, builder: (column) => column);
+
+  GeneratedColumn<String> get mediaType =>
+      $composableBuilder(column: $table.mediaType, builder: (column) => column);
+
+  GeneratedColumn<String> get coverUrl =>
+      $composableBuilder(column: $table.coverUrl, builder: (column) => column);
 
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
@@ -2483,6 +2651,9 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<String?> originalUrl = const Value.absent(),
             Value<int?> mediaAssetId = const Value.absent(),
             Value<String?> sourceTitle = const Value.absent(),
+            Value<String?> htmlClip = const Value.absent(),
+            Value<String?> mediaType = const Value.absent(),
+            Value<String?> coverUrl = const Value.absent(),
             Value<String?> note = const Value.absent(),
             Value<String?> lang = const Value.absent(),
             Value<String> status = const Value.absent(),
@@ -2495,6 +2666,9 @@ class $$ItemsTableTableManager extends RootTableManager<
             originalUrl: originalUrl,
             mediaAssetId: mediaAssetId,
             sourceTitle: sourceTitle,
+            htmlClip: htmlClip,
+            mediaType: mediaType,
+            coverUrl: coverUrl,
             note: note,
             lang: lang,
             status: status,
@@ -2507,6 +2681,9 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<String?> originalUrl = const Value.absent(),
             Value<int?> mediaAssetId = const Value.absent(),
             Value<String?> sourceTitle = const Value.absent(),
+            Value<String?> htmlClip = const Value.absent(),
+            Value<String?> mediaType = const Value.absent(),
+            Value<String?> coverUrl = const Value.absent(),
             Value<String?> note = const Value.absent(),
             Value<String?> lang = const Value.absent(),
             Value<String> status = const Value.absent(),
@@ -2519,6 +2696,9 @@ class $$ItemsTableTableManager extends RootTableManager<
             originalUrl: originalUrl,
             mediaAssetId: mediaAssetId,
             sourceTitle: sourceTitle,
+            htmlClip: htmlClip,
+            mediaType: mediaType,
+            coverUrl: coverUrl,
             note: note,
             lang: lang,
             status: status,
