@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
@@ -367,7 +367,10 @@ class _HtmlClipView extends StatelessWidget {
         children: [
           Text('选区快照', style: Theme.of(context).textTheme.labelMedium),
           const SizedBox(height: 8),
-          Html(data: html),
+          HtmlWidget(
+            html,
+            textStyle: Theme.of(context).textTheme.bodyMedium,
+          ),
         ],
       ),
     );
