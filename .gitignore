@@ -10,8 +10,7 @@ build/
 *.iml
 .vscode/
 
-# 生成代码（本地运行 dart run build_runner build 生成）
-**/*.g.dart
+# 生成代码（drift 的 database.g.dart 已提交进仓库，CI 无需再跑 codegen）
 **/*.freezed.dart
 
 # 系统
