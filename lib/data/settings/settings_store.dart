@@ -71,6 +71,28 @@ class SettingsStore {
   Future<void> setOneClientSecret(String v) =>
       _prefs.setString('settings.one_client_secret', v);
 
+  // ---- Dropbox（C 档网盘适配器）----
+
+  String? get dropboxClientId => _prefs.getString('settings.dropbox_client_id');
+  Future<void> setDropboxClientId(String v) =>
+      _prefs.setString('settings.dropbox_client_id', v);
+
+  String? get dropboxClientSecret =>
+      _prefs.getString('settings.dropbox_client_secret');
+  Future<void> setDropboxClientSecret(String v) =>
+      _prefs.setString('settings.dropbox_client_secret', v);
+
+  // ---- Google Drive（C 档网盘适配器）----
+
+  String? get gdriveClientId => _prefs.getString('settings.gdrive_client_id');
+  Future<void> setGdriveClientId(String v) =>
+      _prefs.setString('settings.gdrive_client_id', v);
+
+  String? get gdriveClientSecret =>
+      _prefs.getString('settings.gdrive_client_secret');
+  Future<void> setGdriveClientSecret(String v) =>
+      _prefs.setString('settings.gdrive_client_secret', v);
+
   /// 最近一次备份时间（本地展示用）。
   DateTime? get lastBackupAt {
     final raw = _prefs.getString('settings.last_backup_at');

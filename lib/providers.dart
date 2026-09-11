@@ -11,6 +11,8 @@ import 'data/sync/netdisk/ali_drive.dart';
 import 'data/sync/netdisk/baidu_auth.dart';
 import 'data/sync/netdisk/baidu_drive.dart';
 import 'data/sync/netdisk/common.dart';
+import 'data/sync/netdisk/dropbox_drive.dart';
+import 'data/sync/netdisk/gdrive_drive.dart';
 import 'data/sync/netdisk/onedrive_drive.dart';
 import 'data/sync/sync_service.dart';
 import 'domain/tagging/language.dart';
@@ -84,6 +86,30 @@ final syncServiceProvider = Provider<SyncService>((ref) {
         clientId: settings.oneClientId!.trim(),
         clientSecret: settings.oneClientSecret ?? '',
         tokenStore: PrefsTokenStore(ref.watch(sharedPrefsProvider), 'onedrive'),
+      ),
+    );
+  }
+  if (settings.syncChannel == 'dropbox' &&
+      settings.dropboxClientId != null &&
+      settings.dropboxClientId!.trim().isNotEmpty) {
+    return SyncService(
+      db: db,
+      cloud: DropboxDrive(
+        clientId: settings.dropboxClientId!.trim(),
+        clientSecret: settings.dropboxClientSecret ?? '',
+        tokenStore: PrefsTokenStore(ref.watch(sharedPrefsProvider), 'dropbox'),
+      ),
+    );
+  }
+  if (settings.syncChannel == 'gdrive' &&
+      settings.gdriveClientId != null &&
+      settings.gdriveClientId!.trim().isNotEmpty) {
+    return SyncService(
+      db: db,
+      cloud: GoogleDriveDrive(
+        clientId: settings.gdriveClientId!.trim(),
+        clientSecret: settings.gdriveClientSecret ?? '',
+        tokenStore: PrefsTokenStore(ref.watch(sharedPrefsProvider), 'gdrive'),
       ),
     );
   }

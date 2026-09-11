@@ -154,7 +154,7 @@ class _MediaMaintenanceCardState extends ConsumerState<_MediaMaintenanceCard> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     // 媒体文件维护仅对支持媒体接口的通道显示（WebDAV / 各网盘适配器）
-    const mediaChannels = {'webdav', 'baidu', 'ali', 'onedrive'};
+    const mediaChannels = {'webdav', 'baidu', 'ali', 'onedrive', 'dropbox', 'gdrive'};
     if (!mediaChannels.contains(settings.syncChannel)) {
       return const SizedBox.shrink();
     }

@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../data/sync/netdisk/ali_drive.dart';
 import '../../data/sync/netdisk/baidu_auth.dart';
 import '../../data/sync/netdisk/common.dart';
+import '../../data/sync/netdisk/dropbox_drive.dart';
+import '../../data/sync/netdisk/gdrive_drive.dart';
 import '../../data/sync/netdisk/onedrive_drive.dart';
 import '../../providers.dart';
 
@@ -54,6 +56,12 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
       case 'onedrive':
         _idCtrl.text = s.oneClientId ?? '';
         _secretCtrl.text = s.oneClientSecret ?? '';
+      case 'dropbox':
+        _idCtrl.text = s.dropboxClientId ?? '';
+        _secretCtrl.text = s.dropboxClientSecret ?? '';
+      case 'gdrive':
+        _idCtrl.text = s.gdriveClientId ?? '';
+        _secretCtrl.text = s.gdriveClientSecret ?? '';
     }
   }
 
@@ -99,6 +107,8 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
       'baidu' => BaiduTokenStore(prefs).hasToken,
       'ali' => PrefsTokenStore(prefs, 'ali').hasToken,
       'onedrive' => PrefsTokenStore(prefs, 'onedrive').hasToken,
+      'dropbox' => PrefsTokenStore(prefs, 'dropbox').hasToken,
+      'gdrive' => PrefsTokenStore(prefs, 'gdrive').hasToken,
       _ => false,
     };
   }
@@ -117,6 +127,12 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
       case 'onedrive':
         await s.setOneClientId(id);
         await s.setOneClientSecret(secret);
+      case 'dropbox':
+        await s.setDropboxClientId(id);
+        await s.setDropboxClientSecret(secret);
+      case 'gdrive':
+        await s.setGdriveClientId(id);
+        await s.setGdriveClientSecret(secret);
     }
     ref.invalidate(syncServiceProvider);
     _snack('$channel 凭据已保存');
@@ -132,6 +148,8 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
       'baidu' => BaiduAuth.buildAuthorizeUrl(id),
       'ali' => AliDrive.buildAuthorizeUrl(id),
       'onedrive' => OneDriveDrive.buildAuthorizeUrl(id),
+      'dropbox' => DropboxDrive.buildAuthorizeUrl(id),
+      'gdrive' => GoogleDriveDrive.buildAuthorizeUrl(id),
       _ => throw UnsupportedError(channel),
     });
   }
@@ -187,6 +205,29 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
             },
           );
           await PrefsTokenStore(ref.read(sharedPrefsProvider), 'onedrive').save(t);
+        case 'dropbox':
+          final t = await exchangeNetdiskToken(
+            endpoint: Uri.parse(DropboxDrive.tokenUrl),
+            body: {
+              'grant_type': 'authorization_code',
+              'code': code,
+              'client_id': id,
+              'client_secret': secret,
+            },
+          );
+          await PrefsTokenStore(ref.read(sharedPrefsProvider), 'dropbox').save(t);
+        case 'gdrive':
+          final t = await exchangeNetdiskToken(
+            endpoint: Uri.parse(GoogleDriveDrive.tokenUrl),
+            body: {
+              'grant_type': 'authorization_code',
+              'code': code,
+              'client_id': id,
+              'client_secret': secret,
+              'redirect_uri': 'oob',
+            },
+          );
+          await PrefsTokenStore(ref.read(sharedPrefsProvider), 'gdrive').save(t);
       }
       _codeCtrl.clear();
       ref.invalidate(syncServiceProvider);
@@ -207,6 +248,10 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
         await PrefsTokenStore(prefs, 'ali').clear();
       case 'onedrive':
         await PrefsTokenStore(prefs, 'onedrive').clear();
+      case 'dropbox':
+        await PrefsTokenStore(prefs, 'dropbox').clear();
+      case 'gdrive':
+        await PrefsTokenStore(prefs, 'gdrive').clear();
     }
     ref.invalidate(syncServiceProvider);
     _snack('已解除授权');
@@ -302,6 +347,8 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
                   ('baidu', '百度网盘'),
                   ('ali', '阿里云盘'),
                   ('onedrive', 'OneDrive'),
+                  ('dropbox', 'Dropbox'),
+                  ('gdrive', 'Google Drive'),
                 ])
                   ChoiceChip(
                     label: Text(label),
@@ -349,7 +396,9 @@ class _CloudBackupSectionState extends ConsumerState<CloudBackupSection> {
             ],
             if (_channel == 'baidu' ||
                 _channel == 'ali' ||
-                _channel == 'onedrive') ...[
+                _channel == 'onedrive' ||
+                _channel == 'dropbox' ||
+                _channel == 'gdrive') ...[
               TextField(
                 controller: _idCtrl,
                 decoration: const InputDecoration(

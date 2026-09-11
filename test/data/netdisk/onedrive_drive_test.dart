@@ -100,9 +100,8 @@ void main() {
   });
 
   test('令牌失效 401 自动刷新后重试', () async {
-    var calls = 0;
+    var failing = 1; // 单次过期：刷新后重试即成功
     final client = MockClient((request) async {
-      calls++;
       if (request.url.host == 'login.microsoftonline.com') {
         return http.Response(
           jsonEncode({
@@ -113,7 +112,7 @@ void main() {
           200,
         );
       }
-      if (calls <= 2) return http.Response('', 401);
+      if (failing-- > 0) return http.Response('', 401);
       return http.Response(jsonEncode({'value': []}), 200);
     });
     final prefs = await SharedPreferences.getInstance();

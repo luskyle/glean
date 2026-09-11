@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Glean 收藏助手 —— 把散落的好内容拾进来</title>
-<meta name="description" content="把散落的好内容拾进来：单词、摘录、灵感、网页。剪贴板监听轻提示，分组整理，素材库链接本地媒体，数据通过你自己的 WebDAV 云盘同步——数据永远属于你。">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+<title>Glean 收藏助手 —— 万物皆可轻松收藏</title>
+<meta name="description" content="万物皆可轻松收藏：网页、链接、选区、图片、视频、音频、文件、整页离线——浏览器右键一键收下；数据走你自己的云盘（iCloud / WebDAV / 百度 / 阿里 / OneDrive / Dropbox / Google Drive），服务器零存储。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧲</text></svg>">
 <style>
   :root {
     --primary: #2F6BFF;
@@ -31,7 +31,6 @@
   a:hover { text-decoration: underline; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 
-  /* ---------- 导航 ---------- */
   nav {
     position: sticky; top: 0; z-index: 10;
     background: rgba(255,255,255,.85);
@@ -57,7 +56,6 @@
   .btn:hover { filter: brightness(1.08); text-decoration: none; }
   .btn.ghost { background: var(--bg); color: var(--ink) !important; border: 1px solid var(--line); }
 
-  /* ---------- Hero ---------- */
   header {
     background:
       radial-gradient(600px 300px at 85% 0%, #EAF0FF 0%, transparent 60%),
@@ -72,11 +70,10 @@
   }
   header h1 { font-size: 52px; line-height: 1.25; letter-spacing: -1px; font-weight: 800; }
   header h1 em { font-style: normal; color: var(--primary); }
-  header .sub { margin: 20px auto 32px; max-width: 560px; color: var(--ink-2); font-size: 17px; }
+  header .sub { margin: 20px auto 32px; max-width: 620px; color: var(--ink-2); font-size: 17px; }
   .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
   .hero-meta { margin-top: 28px; font-size: 13px; color: var(--ink-2); }
 
-  /* App 窗口 mock */
   .mock {
     margin: 64px auto 0; max-width: 860px; text-align: left;
     border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
@@ -111,7 +108,6 @@
   .mock-card .badge { font-size: 11px; color: var(--primary); background: var(--primary-soft); padding: 2px 8px; border-radius: 999px; }
   .mock-card .time { font-size: 11px; color: var(--ink-2); margin-left: auto; }
 
-  /* ---------- 区块 ---------- */
   section { padding: 88px 0; }
   section.alt { background: var(--bg-soft); }
   .sec-head { text-align: center; max-width: 640px; margin: 0 auto 48px; }
@@ -134,8 +130,7 @@
   .card ul li { padding-left: 18px; position: relative; margin-bottom: 4px; }
   .card ul li::before { content: "✓"; position: absolute; left: 0; color: var(--primary); font-weight: 700; }
 
-  /* 管道流程 */
-  .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; align-items: center; }
+  .flow { display: grid; grid-template-columns: repeat(10, 1fr); gap: 0; align-items: center; }
   .flow .step { text-align: center; padding: 12px 6px; }
   .flow .step .n {
     width: 40px; height: 40px; margin: 0 auto 10px; border-radius: 50%;
@@ -146,7 +141,6 @@
   .flow .step small { font-size: 12px; color: var(--ink-2); }
   .flow .arrow { color: var(--line); font-size: 20px; text-align: center; }
 
-  /* 隐私横幅 */
   .privacy {
     background: linear-gradient(120deg, #16305F 0%, #2F6BFF 100%);
     color: #fff; border-radius: 22px; padding: 44px 40px;
@@ -159,7 +153,6 @@
     background: rgba(255,255,255,.12); border-radius: 12px; padding: 10px 14px; font-size: 13px;
   }
 
-  /* 路线图 */
   table { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--bg); }
   th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); }
   th { color: var(--ink-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
@@ -168,7 +161,6 @@
   .tag.next { background: var(--primary-soft); color: var(--primary); }
   .tag.later { background: #F1F3F7; color: var(--ink-2); }
 
-  /* 下载 */
   .dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
   .dl .card { text-align: center; }
   .dl .card .ico { margin: 0 auto 14px; }
@@ -177,14 +169,13 @@
   footer { border-top: 1px solid var(--line); padding: 36px 0; text-align: center; color: var(--ink-2); font-size: 13px; }
   footer .links { display: flex; gap: 18px; justify-content: center; margin-bottom: 10px; }
 
-  /* 淡入 */
   .fade { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
   .fade.in { opacity: 1; transform: none; }
 
   @media (max-width: 860px) {
     header h1 { font-size: 36px; }
     .grid3, .grid2x2, .dl { grid-template-columns: 1fr; }
-    .flow { grid-template-columns: repeat(3, 1fr); }
+    .flow { grid-template-columns: repeat(5, 1fr); }
     .flow .arrow { display: none; }
     .privacy { grid-template-columns: 1fr; padding: 32px 24px; }
     .mock-body { grid-template-columns: 1fr; }
@@ -197,12 +188,12 @@
 
 <nav>
   <div class="wrap">
-    <a class="logo" href="#"><span class="mark">📖</span>Glean</a>
+    <a class="logo" href="#"><span class="mark">🧲</span>Glean</a>
     <div class="nav-links">
       <a href="#feature">功能</a>
       <a href="#flow">如何工作</a>
+      <a href="#drives">云盘</a>
       <a href="#privacy">隐私</a>
-      <a href="#roadmap">路线图</a>
       <a href="#download">下载</a>
     </div>
     <a class="btn ghost" href="https://github.com/luskyle/glean" target="_blank" rel="noopener">GitHub</a>
@@ -212,14 +203,14 @@
 
 <header>
   <div class="wrap">
-    <span class="kicker">🗂️ 收藏 · 整理 · 同步</span>
-    <h1>把散落的好内容<br>拾进来，<em>归好类</em></h1>
-    <p class="sub">单词、摘录、灵感、网页——剪贴板复制或手录进来，自动识别语言、自动带出处，进你自己的分组。数据通过你自己的 WebDAV 云盘同步，本地素材只留在本地。</p>
+    <span class="kicker">🧲 万物收藏 · 私有云盘 · 数据属于你</span>
+    <h1>万物皆可<br><em>轻松收藏</em></h1>
+    <p class="sub">网页、链接、选区、图片、视频、音频、文件、整页离线——浏览器右键一键全收下，自动分类、自动标注语言；数据只进你自己的网盘，服务器零存储。</p>
     <div class="hero-cta">
       <a class="btn" href="#download">下载 App</a>
       <a class="btn ghost" href="https://github.com/luskyle/glean/releases" target="_blank" rel="noopener">查看 Release</a>
     </div>
-    <div class="hero-meta">免费开源（Apache-2.0） · 本地优先 · 数据属于你</div>
+    <div class="hero-meta">免费开源（Apache-2.0）· 本地优先 · 7 种云盘通道</div>
 
     <div class="mock fade">
       <div class="mock-bar">
@@ -227,29 +218,28 @@
       </div>
       <div class="mock-body">
         <div class="mock-side">
-          <span class="active">待归类 · 3</span>
-          <span>灵感</span>
+          <span class="active">全部收藏</span>
           <span>读书</span>
-          <span>翻译</span>
+          <span>灵感</span>
           <span>未分类</span>
-          <span>素材库</span>
+          <span>设置</span>
         </div>
         <div class="mock-main">
           <div class="mock-search">🔍 搜索收藏…</div>
           <div class="mock-card">
-            <span class="badge">日</span>
-            <div><b>食べる</b><br><small>剪贴板 · 自动标语言</small></div>
-            <span class="time">待归类</span>
+            <span class="badge">🖼 图片</span>
+            <div><b>示例封面</b><br><small>右键图片收藏 · 原图已入云盘</small></div>
+            <span class="time">今天</span>
           </div>
           <div class="mock-card">
-            <span class="badge">英</span>
-            <div><b>spaced repetition</b><br><small><a href="#">原文链接</a> · 出处自动记录</small></div>
-            <span class="time">灵感</span>
+            <span class="badge">📄 离线</span>
+            <div><b>Spaced Repetition 指南（整页离线）</b><br><small>单文件 HTML · 打开原文</small></div>
+            <span class="time">昨天</span>
           </div>
           <div class="mock-card">
-            <span class="badge">中</span>
-            <div><b>把收藏变成资产，而不是积灰</b><br><small>备注：产品笔记</small></div>
-            <span class="time">已收藏</span>
+            <span class="badge">🔗 链接</span>
+            <div><b>值得收藏的一篇文章</b><br><small>来源页 · 描述 · 封面</small></div>
+            <span class="time">3 天前</span>
           </div>
         </div>
       </div>
@@ -260,52 +250,52 @@
 <section id="feature">
   <div class="wrap">
     <div class="sec-head fade">
-      <h2>一根管道：收进来 · 归好类 · 带得走</h2>
-      <p>Glean 不是一个剪藏夹——它是你的收藏入口，把散落的内容变成井然有序、随时可带走的资产。</p>
+      <h2>收藏进得来、存得稳、带得走</h2>
+      <p>从浏览器右键到你的私人云盘，一条管道全部打通。</p>
     </div>
     <div class="grid2x2">
       <div class="card fade">
-        <div class="ico">📥</div>
-        <h3>收藏管道</h3>
-        <p>不管内容从哪来，都进同一条管道：收件箱 → 归类 → 归档。</p>
+        <div class="ico">🧲</div>
+        <h3>六类收藏（浏览器扩展）</h3>
+        <p>右键即收，任何抓不到的内容自动降级为引用，收藏动作永不失败。</p>
         <ul>
-          <li>手录收藏：备注 + 标签 + 分组</li>
-          <li>剪贴板监听轻提示「有内容要收藏？」</li>
-          <li>网页摘录自动带出处（原文链接 + 来源页标题）</li>
-          <li>内容语言自动标注（中 / 日 / 英 / 其他）</li>
+          <li>划词（文本 + 选区 HTML 快照）</li>
+          <li>图片 / 视频·音频 / PDF 等任意文件直传媒体库</li>
+          <li>网页链接 + 描述 / og 封面；批量收藏页面图片</li>
+          <li>整页离线归档（静态资源内联为单文件 HTML）</li>
         </ul>
       </div>
       <div class="card fade">
         <div class="ico">🗂️</div>
-        <h3>整理体系</h3>
-        <p>待归类 → 已收藏 → 已归档，三层分类（库 → 子集）多对多归属。</p>
+        <h3>自动整理</h3>
+        <p>收下的内容进收件箱，语言自动标注，随时归入你的分类。</p>
         <ul>
-          <li>状态分段：待归类 / 已收藏 / 已归档 / 全部</li>
-          <li>库 → 子集两级分组，主库标记默认归属</li>
-          <li>多标签交叉，搜索增强</li>
-          <li>桌面宽屏侧栏直达分组</li>
-        </ul>
-      </div>
-      <div class="card fade">
-        <div class="ico">🖼️</div>
-        <h3>本地素材库</h3>
-        <p>链接本地目录（不导入媒体），递归索引图片 / 视频，仅本地使用。</p>
-        <ul>
-          <li>文件夹链接 + 用途批注（这张图是干嘛用的）</li>
-          <li>目录分组视图，网格 / 列表切换</li>
-          <li>视频就地播放，素材随时引用进收藏</li>
-          <li>素材不参与云同步——大文件只留在本机</li>
+          <li>分类 / 子集两级体系 + 标签交叉</li>
+          <li>中文 / 日语 / 英语等语言自动识别</li>
+          <li>全文搜索：内容、出处、标签</li>
+          <li>超体积弹窗询问「源文件 / 仅链接」</li>
         </ul>
       </div>
       <div class="card fade">
         <div class="ico">☁️</div>
-        <h3>数据带你走</h3>
-        <p>同步只走你自己的云盘，导出随时带走，服务器零存储。</p>
+        <h3>七种云盘通道</h3>
+        <p>原生适配你已有的网盘，媒体文件也能从 App 打开。</p>
         <ul>
-          <li>WebDAV 通道：启动静默合并 + 前台周期同步</li>
-          <li>本机写入方（浏览器插件等）实时通知同步</li>
-          <li>删除墓碑防复活，删除跨端生效</li>
-          <li>一键导出 zip（JSON 机器可读），数据随时插拔</li>
+          <li>iCloud / WebDAV（坚果云、NAS、alist）</li>
+          <li>百度 / 阿里 / OneDrive / Dropbox / Google Drive</li>
+          <li>启动合并 + 周期同步 + 插件写入实时通知</li>
+          <li>打开媒体 / 离线页；一键清理云盘孤儿文件</li>
+        </ul>
+      </div>
+      <div class="card fade">
+        <div class="ico">🔒</div>
+        <h3>数据属于你</h3>
+        <p>本地优先 + 服务器零存储，是架构铁律不是口号。</p>
+        <ul>
+          <li>全部数据本地 SQLite，一键导出 zip（JSON 机器可读）</li>
+          <li>云盘只进你自己的账号；媒体永不进第三方服务器</li>
+          <li>删除跨端同步（墓碑防复活）</li>
+          <li>Apache-2.0 开源，可审计</li>
         </ul>
       </div>
     </div>
@@ -316,18 +306,39 @@
   <div class="wrap">
     <div class="sec-head fade">
       <h2>一句话看懂它怎么工作</h2>
-      <p>收藏即入口——拾进来的内容，被 Glean 归置得明明白白。</p>
+      <p>右键收藏即入口——收下的东西，Glean 替你分类、同步、保管。</p>
     </div>
     <div class="flow fade">
-      <div class="step"><div class="n">1</div><b>拾进来</b><small>手录 / 剪贴板 / 分享</small></div>
+      <div class="step"><div class="n">1</div><b>右键收藏</b><small>六类内容一键收</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">2</div><b>自动标注</b><small>语言自动识别</small></div>
+      <div class="step"><div class="n">2</div><b>自动整理</b><small>语言 / 分类 / 标签</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">3</div><b>进分组</b><small>库 / 子集两级归类</small></div>
+      <div class="step"><div class="n">3</div><b>进你的云盘</b><small>7 通道私有同步</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">4</div><b>云盘同步</b><small>WebDAV，多端一致</small></div>
+      <div class="step"><div class="n">4</div><b>随时打开</b><small>媒体 / 离线页 / 桌面端</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">5</div><b>带走</b><small>一键导出 / 随时归档</small></div>
+      <div class="step"><div class="n">5</div><b>随时带走</b><small>导出 zip / 数据永续</small></div>
+    </div>
+  </div>
+</section>
+
+<section id="drives">
+  <div class="wrap">
+    <div class="sec-head fade">
+      <h2>云盘支持矩阵</h2>
+      <p>数据只进你自己的账号；无 WebDAV 的网盘请用 alist 桥接（文档含 3 分钟配置）。</p>
+    </div>
+    <div class="fade" style="overflow-x:auto;">
+      <table>
+        <tr><th>通道</th><th>方式</th><th>特点</th></tr>
+        <tr><td><b>iCloud Drive</b></td><td>原生通道</td><td>iOS 主力，ChatGPT 配额随用户</td></tr>
+        <tr><td><b>WebDAV</b></td><td>标准协议</td><td>坚果云 / 群晖·威联通 NAS / alist 桥接任意网盘</td></tr>
+        <tr><td><b>百度网盘</b></td><td>原生适配器</td><td>superfile2 分片上传，应用目录</td></tr>
+        <tr><td><b>阿里云盘</b></td><td>原生适配器</td><td>Open API 单分片直传</td></tr>
+        <tr><td><b>OneDrive</b></td><td>原生适配器</td><td>AppFolder 专用目录（不动用户文件）</td></tr>
+        <tr><td><b>Dropbox</b></td><td>原生适配器</td><td>App folder 权限，files/upload</td></tr>
+        <tr><td><b>Google Drive</b></td><td>原生适配器</td><td>AppData 专属空间（不触碰用户文件）</td></tr>
+      </table>
     </div>
   </div>
 </section>
@@ -338,38 +349,14 @@
       <div>
         <h2>数据默认属于你</h2>
         <p>Glean 把「拿不回数据」的担心当作首要设计约束：本地优先，隐私默认。</p>
-        <p>同步走进你自己的云盘（WebDAV），服务器永不存储你的任何数据与媒体文件——这是架构上的铁律，不是口头承诺。</p>
+        <p>同步走进你自己的云盘，服务器永不存储你的任何数据与媒体文件——这是架构上的铁律，不是口头承诺。</p>
       </div>
       <div class="list">
-        <div>📦 收藏与素材数据默认仅保存在本机</div>
+        <div>📦 收藏与媒体数据默认仅保存在本机</div>
         <div>📤 一键导出 zip，随时插拔</div>
-        <div>🔄 云盘同步：数据只进你自己的 WebDAV</div>
-        <div>🧹 可编辑、可删除、删了就是删了（删除跨端同步）</div>
+        <div>🔄 云盘同步：只进你自己的账号（7 通道）</div>
+        <div>🧹 可编辑、可删除、删了就是删了（跨端同步）</div>
       </div>
-    </div>
-  </div>
-</section>
-
-<section id="roadmap">
-  <div class="wrap">
-    <div class="sec-head fade">
-      <h2>路线图</h2>
-      <p>已完成的核心闭环，与正在路上的能力。</p>
-    </div>
-    <div class="fade" style="overflow-x:auto;">
-      <table>
-        <tr><th>能力</th><th>状态</th><th>说明</th></tr>
-        <tr><td>收藏管道（手录 / 剪贴板 / 分享）</td><td><span class="tag now">已上线</span></td><td>收件箱 → 归类 → 归档，语言自动标注</td></tr>
-        <tr><td>分组体系（库 → 子集 + 标签）</td><td><span class="tag now">已上线</span></td><td>多对多归属、主库标记、搜索增强</td></tr>
-        <tr><td>本地素材库</td><td><span class="tag now">已上线</span></td><td>目录链接不导入，图片 / 视频索引</td></tr>
-        <tr><td>云盘同步（WebDAV）</td><td><span class="tag now">已上线</span></td><td>多端合并、删除跨端同步；服务器 0 存储</td></tr>
-        <tr><td>一键导出 zip</td><td><span class="tag now">已上线</span></td><td>JSON 机器可读 + 说明文件</td></tr>
-        <tr><td>主题切换（跟随系统 / 浅色 / 深色）</td><td><span class="tag now">已上线</span></td><td>iOS HIG 风格，全端一致</td></tr>
-        <tr><td>OCR 拍照收藏 / 系统分享面板</td><td><span class="tag next">V1.1</span></td><td>拍照进管道，图片存为素材</td></tr>
-        <tr><td>Anki 导入导出</td><td><span class="tag next">V1.1</span></td><td>标准牌组互通，数据零锁定</td></tr>
-        <tr><td>浏览器划词收藏扩展</td><td><span class="tag next">V1.1</span></td><td>browser-extension：选中即收藏，写入自有 WebDAV</td></tr>
-        <tr><td>Windows / macOS 桌面端</td><td><span class="tag later">V2</span></td><td>全键盘整理，多端同一代码库</td></tr>
-      </table>
     </div>
   </div>
 </section>
@@ -402,8 +389,8 @@
       <div class="card fade">
         <div class="ico">🧩</div>
         <h3>浏览器扩展</h3>
-        <p>Manifest V3 划词收藏，V1.1 路线中。</p>
-        <a class="btn ghost" href="https://github.com/luskyle/glean/tree/main/browser-extension" target="_blank" rel="noopener">开发中</a>
+        <p>Chrome / Edge（MV3），六类收藏入口。</p>
+        <a class="btn" href="https://github.com/luskyle/glean/tree/main/browser-extension" target="_blank" rel="noopener">安装扩展</a>
       </div>
     </div>
   </div>
@@ -416,12 +403,11 @@
       <a href="https://github.com/luskyle/glean/releases" target="_blank" rel="noopener">Releases</a>
       <a href="https://github.com/luskyle/glean/issues" target="_blank" rel="noopener">反馈</a>
     </div>
-    <div>Glean 收藏助手 —— 把散落的好内容拾进来。© 2026 · Apache-2.0 · 本地优先，数据属于你。</div>
+    <div>Glean 收藏助手 —— 万物皆可轻松收藏。© 2026 · Apache-2.0 · 本地优先，数据属于你。</div>
   </div>
 </footer>
 
 <script>
-  // 滚动淡入
   const io = new IntersectionObserver((entries) => {
     entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
   }, { threshold: 0.12 });
