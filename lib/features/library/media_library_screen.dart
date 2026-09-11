@@ -76,7 +76,7 @@ class _MediaLibraryScreenState extends ConsumerState<MediaLibraryScreen> {
   Future<void> _linkFolder() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final dir = await FilePicker.platform.getDirectoryPath(
+      final dir = await FilePicker.getDirectoryPath(
         dialogTitle: '选择素材目录（图片 / 视频）',
       );
       if (dir == null || dir.isEmpty || !mounted) return;
