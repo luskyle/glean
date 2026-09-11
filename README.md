@@ -1,42 +1,42 @@
 # Glean 收藏助手
 
-> 把你想记住的任何东西——单词、摘抄、灵感、考纲——划进收件箱，
-> App 用间隔重复（SM-2）自动安排复习，直到你真正记住。
+> 把散落的好内容拾进来——单词、摘录、灵感、网页——划进收件箱，
+> 归入你自己的分组，素材库链接本地媒体，数据全部留在你的设备上。
 
-**官网**：<https://luskyle.github.io/shiyi/>　｜　[![官网](https://img.shields.io/badge/%E6%8B%BE%E5%BF%86-%E5%AE%98%E7%BD%91-2F6BFF?style=flat-square)](https://luskyle.github.io/shiyi/)
-
-> 官网部署方式：GitHub Settings → Pages → Source 选 `Deploy from a branch`（`main` / `docs`）
-> ——手动分支部署，不做 CI 自动构建。
+**官网**：<https://luskyle.github.io/glean/>　｜　[![官网](https://img.shields.io/badge/Glean-%E5%AE%98%E7%BD%91-2F6BFF?style=flat-square)](https://luskyle.github.io/glean/)
+　[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg?style=flat-square)](LICENSE)
 
 依据《拾忆App架构设计》《开发计划-分阶段功能路线》《技术调研-核心技术选型》
-（vpub/docs/强化记忆）实现的 **MVP 初版**（对应里程碑 M0 ~ 阶段 1 核心闭环）。
+（vpub/docs/强化记忆）实现的 **收藏侧 MVP**：收件箱 + 剪贴板 + 素材库 + 云盘同步的一条收藏管道。
 
 ## 当前版本能力（v0.1.0）
 
-- **三 Tab 常驻**：收件箱 / 复习（默认落点）/ 记忆库，IndexedStack 保状态
-- **收藏管道**：手录收藏（词条/语录/灵感 + 标签 + 分组）、剪贴板监听轻提示
-- **成卡**：词条自动命中内置离线词库补释义/读音（本地优先原则），全部可编辑
-- **复习闭环**：闪卡先猜后看（翻转动画）、三键评级（忘了/模糊/记得）→ SM-2 调度
-- **数据证明**：遗忘曲线（fl_chart 周视图，个人正确率 vs 理论基线）、掌握率/积压统计
-- **记忆库**：全文搜索、语言/状态筛选、分组视图 + 分组掌握率
-- **免费额度**：非 Pro 每日 30 次复习、记忆库 100 张（超限提示不打断复习）
-- **数据所有权**：全部数据本地存储（drift/SQLite），一键导出 JSON
+- **三区布局**：收件箱 / 素材库 / 设置（宽屏桌面左侧栏 + IndexedStack 保状态；窄屏底部 Tab）
+- **收藏管道**：手录收藏（备注 + 标签 + 分组）、剪贴板监听轻提示「有内容要收藏？」、网页摘录自动带出处（原文链接 + 来源页标题）
+- **整理体系**：待归类 / 已收藏 / 已归档三段状态流转；库 → 子集两级分组（多对多、主库标记）
+- **自动标注**：收藏内容自动识别语言（中文 / 日语 / 英语 / 其他）
+- **本地素材库**：链接本地目录（**不导入媒体**），递归索引图片 / 视频，按目录分组 + 网格 / 列表视图 + 用途批注；素材仅本地使用
+- **云盘同步**：WebDAV 通道，启动静默拉取合并 + 前台周期自动同步 + 本机写入方（浏览器插件等）实时通知；删除墓碑防复活
+- **一键导出**：全量数据导出 zip（`glean_data.json` 机器可读 + `README.txt` 说明），数据随时带走
+- **数据所有权**：全部数据本地存储（drift / SQLite），服务器零存储
 
 ## 技术栈（按技术调研选型）
 
 Flutter（stable 线） · Riverpod（flutter_riverpod，无 codegen 简化初版） ·
-drift（SQLite，7 张表：words/cards/items/review_log/collections/item_collections/item_tags）·
-fl_chart · shared_preferences（设置 KV）
+drift（SQLite：items / collections / item_collections / item_tags / sync_deletions /
+media_assets / media_folders）· shared_preferences（设置 KV）·
+webdav_client（云盘同步）· file_picker + video_player（素材库）·
+archive（导出 zip）· flutter_tts（朗读）· url_launcher（打开原文）· intl
 
 ## 工程结构（feature-first）
 
 ```
 lib/
   core/       主题
-  domain/     SM-2 引擎、语言识别（纯 Dart，无 Flutter 依赖，可单独单测）
-  data/       drift 表/库、仓储（收藏/复习/统计）、离线词库、设置、导出
-  features/   inbox（收件箱）/ review（复习+曲线）/ library（记忆库）/ settings
-  shared/     空态、徽标等通用组件
+  domain/     语言标注（纯 Dart，可单独单测）
+  data/       drift 表/库、仓储（收藏/素材）、同步（WebDAV + 本地通知）、导出、设置、分析
+  features/   home（外壳）/ inbox（收件箱）/ library（素材库）/ settings（设置）
+  shared/     空态、状态徽标等通用组件
 ```
 
 ## 开发命令
@@ -49,7 +49,7 @@ export PATH="/media/luskyle/DATA/apps/flutter_dl/flutter/bin:$PATH"
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 
-# 静态检查与测试（M0 验收：analyze 零问题 + test 全绿）
+# 静态检查与测试
 flutter analyze
 flutter test
 
@@ -67,7 +67,8 @@ flutter run
   质量门禁 → 构建 Android APK / Linux tar.gz / iOS 未签名包 → 自动生成中文发布说明 →
   发布 GitHub Release（含全部产物；重复触发自动更新）
 - 发布说明由 `scripts/gen_release_notes.sh` 从 git log 按 Conventional Commits 分组生成
-- 官网（`docs/index.html`，纯静态、零构建依赖）：手动分支部署（Settings → Pages → `Deploy from a branch` → `main` / `docs`），不走 CI/CD
+- 官网（`docs/index.html`，纯静态、零构建依赖）：GitHub Pages 已启用
+  （Settings → Pages → `Deploy from a branch` → `main` / `docs`）
 
 发布前需在仓库配置（可选）：
 - GitHub Secrets（Android 正式签名，缺省时自动回退 debug 签名发布）：
@@ -76,21 +77,24 @@ flutter run
 
 ```bash
 # 出包：打标签即触发（版本号与 pubspec.version 保持一致）
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.1.0 && git push origin v0.1.0
 ```
 
 ## 测试
 
-- `test/domain/sm2_test.dart`：SM-2 引擎 20+ 用例（忘记/模糊/记得、间隔边界、
-  重学路径、EF 钳制 1.3~3.0、到期判定、掌握度投影、长周期稳定性）
-- `test/domain/language_test.dart`：多语言自动标注启发式
-- `test/widget/app_smoke_test.dart`：三 Tab 切换与空态
-- `test/widget/review_flow_test.dart`：复习闭环（翻卡→评级→落库）、重学路径、状态投影
+- `test/domain/analytics_service_test.dart`：本地事件埋点服务
+- `test/data/sync_service_test.dart`：WebDAV 同步合并逻辑（含删除墓碑防复活）
+- `test/live_webdav_test.dart`：真实 WebDAV 服务器集成冒烟（需配置环境变量）
+
+## 开源协议
+
+本项目采用 **Apache License 2.0** 开源，详见 [LICENSE](LICENSE)。
+Contributions 即视为同意以相同协议授权。
 
 ## 与规划的差距（后续版本）
 
-- SM-2 → FSRS（review_log 已保留完整字段，≥4 周数据后可切换）
-- OCR / 分享面板 / Anki 导入导出（V1.1）
-- 云盘同步 B 档、云端日志 C 档（V1.2 / V2）
-- 内购接入（阶段 2，当前订阅墙为方案占位）
-- 词库管线：Python 清洗 JLPT/COCA → JSON 导入（当前为内置微型样例词库）
+- OCR 拍照收藏 / 系统分享面板（V1.1）
+- Anki 导入导出（V1.1）
+- 浏览器划词收藏扩展（browser-extension，待接入）
+- Windows / macOS 桌面端（V2）
+- 删除墓碑 → 云端日志（V2，当前删除跨端同步靠本地墓碑）

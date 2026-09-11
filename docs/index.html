@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>拾忆 Shiyi —— 收藏驱动的记忆工具</title>
-<meta name="description" content="把你想记住的任何东西收进来：单词、摘抄、灵感、考纲。浏览器划词收藏直达你的分类，拾忆用间隔重复（SM-2）自动安排复习，用真实数据证明你的记忆在变好。">
+<title>Glean 收藏助手 —— 把散落的好内容拾进来</title>
+<meta name="description" content="把散落的好内容拾进来：单词、摘录、灵感、网页。剪贴板监听轻提示，分组整理，素材库链接本地媒体，数据通过你自己的 WebDAV 云盘同步——数据永远属于你。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 <style>
   :root {
@@ -197,7 +197,7 @@
 
 <nav>
   <div class="wrap">
-    <a class="logo" href="#"><span class="mark">📖</span>拾忆</a>
+    <a class="logo" href="#"><span class="mark">📖</span>Glean</a>
     <div class="nav-links">
       <a href="#feature">功能</a>
       <a href="#flow">如何工作</a>
@@ -205,51 +205,51 @@
       <a href="#roadmap">路线图</a>
       <a href="#download">下载</a>
     </div>
-    <a class="btn ghost" href="https://github.com/luskyle/shiyi" target="_blank" rel="noopener">GitHub</a>
+    <a class="btn ghost" href="https://github.com/luskyle/glean" target="_blank" rel="noopener">GitHub</a>
     <a class="btn" href="#download">立即开始</a>
   </div>
 </nav>
 
 <header>
   <div class="wrap">
-    <span class="kicker">🗂️ 收藏 · 记忆 · 证明</span>
-    <h1>把想记住的任何东西<br>收进来，<em>它替你还</em></h1>
-    <p class="sub">单词、摘抄、灵感、考纲——浏览器划词或从任何 App 划进来，直接进你的分类。拾忆用间隔重复（SM-2）自动安排复习，直到你真正记住。</p>
+    <span class="kicker">🗂️ 收藏 · 整理 · 同步</span>
+    <h1>把散落的好内容<br>拾进来，<em>归好类</em></h1>
+    <p class="sub">单词、摘录、灵感、网页——剪贴板复制或手录进来，自动识别语言、自动带出处，进你自己的分组。数据通过你自己的 WebDAV 云盘同步，本地素材只留在本地。</p>
     <div class="hero-cta">
       <a class="btn" href="#download">下载 App</a>
-      <a class="btn ghost" href="https://github.com/luskyle/shiyi/releases" target="_blank" rel="noopener">查看 Release</a>
+      <a class="btn ghost" href="https://github.com/luskyle/glean/releases" target="_blank" rel="noopener">查看 Release</a>
     </div>
-    <div class="hero-meta">免费开源 · 本地优先 · 多端同步 · 数据永久属于你</div>
+    <div class="hero-meta">免费开源（Apache-2.0） · 本地优先 · 数据属于你</div>
 
     <div class="mock fade">
       <div class="mock-bar">
-        <i></i><i></i><i></i><span class="mock-title">拾忆 Shiyi</span>
+        <i></i><i></i><i></i><span class="mock-title">Glean</span>
       </div>
       <div class="mock-body">
         <div class="mock-side">
-          <span class="active">今日复习 · 3</span>
-          <span>学习 · 日语</span>
-          <span>分组</span>
-          <span>工作</span>
-          <span>学习</span>
+          <span class="active">待归类 · 3</span>
+          <span>灵感</span>
+          <span>读书</span>
+          <span>翻译</span>
           <span>未分类</span>
+          <span>素材库</span>
         </div>
         <div class="mock-main">
           <div class="mock-search">🔍 搜索收藏…</div>
           <div class="mock-card">
             <span class="badge">日</span>
-            <div><b>食べる</b><br><small>たべる · 吃</small></div>
-            <span class="time">明天复习</span>
+            <div><b>食べる</b><br><small>剪贴板 · 自动标语言</small></div>
+            <span class="time">待归类</span>
           </div>
           <div class="mock-card">
             <span class="badge">英</span>
-            <div><b>spaced repetition</b><br><small>间隔重复——复习的关键</small></div>
-            <span class="time">3 天后</span>
+            <div><b>spaced repetition</b><br><small><a href="#">原文链接</a> · 出处自动记录</small></div>
+            <span class="time">灵感</span>
           </div>
           <div class="mock-card">
             <span class="badge">中</span>
-            <div><b>把收藏变成记忆，而不是积灰</b><br><small>灵感 · 引自产品设计笔记</small></div>
-            <span class="time">明天复习</span>
+            <div><b>把收藏变成资产，而不是积灰</b><br><small>备注：产品笔记</small></div>
+            <span class="time">已收藏</span>
           </div>
         </div>
       </div>
@@ -260,52 +260,52 @@
 <section id="feature">
   <div class="wrap">
     <div class="sec-head fade">
-      <h2>四个支柱：收进来 · 记得住 · 学得会 · 看得见</h2>
-      <p>拾忆不是一个剪藏夹——收藏只是开始，学习拉近记忆，复习负责记住，曲线负责证明。</p>
+      <h2>一根管道：收进来 · 归好类 · 带得走</h2>
+      <p>Glean 不是一个剪藏夹——它是你的收藏入口，把散落的内容变成井然有序、随时可带走的资产。</p>
     </div>
     <div class="grid2x2">
       <div class="card fade">
-        <div class="ico">🖱️</div>
-        <h3>浏览器划词收藏</h3>
-        <p>网页选中即收藏：右键直达分组，写入你自己的 WebDAV 云盘，桌面秒级出现。</p>
+        <div class="ico">📥</div>
+        <h3>收藏管道</h3>
+        <p>不管内容从哪来，都进同一条管道：收件箱 → 归类 → 归档。</p>
         <ul>
-          <li>右键菜单：选分类后收藏 / 分组直达</li>
-          <li>收藏内容直接进对应分组</li>
-          <li>桌面 / 浏览器分类双向实时同步</li>
-          <li>完全离线优先，服务器零存储</li>
+          <li>手录收藏：备注 + 标签 + 分组</li>
+          <li>剪贴板监听轻提示「有内容要收藏？」</li>
+          <li>网页摘录自动带出处（原文链接 + 来源页标题）</li>
+          <li>内容语言自动标注（中 / 日 / 英 / 其他）</li>
         </ul>
       </div>
       <div class="card fade">
-        <div class="ico">🧠</div>
-        <h3>间隔重复引擎</h3>
-        <p>自研 SM-2 调度（纯函数、20+ 单测）：在对的时间复习，记忆效率最大化。</p>
+        <div class="ico">🗂️</div>
+        <h3>整理体系</h3>
+        <p>待归类 → 已收藏 → 已归档，三层分类（库 → 子集）多对多归属。</p>
         <ul>
-          <li>闪卡先猜后看 + 三键评级</li>
-          <li>忘了 / 模糊 / 记得 → 自动调整间隔</li>
-          <li>断点续复习，随时退出不丢进度</li>
-          <li>review_log 全量留痕，可切 FSRS</li>
+          <li>状态分段：待归类 / 已收藏 / 已归档 / 全部</li>
+          <li>库 → 子集两级分组，主库标记默认归属</li>
+          <li>多标签交叉，搜索增强</li>
+          <li>桌面宽屏侧栏直达分组</li>
         </ul>
       </div>
       <div class="card fade">
-        <div class="ico">🌏</div>
-        <h3>主动学习 · 多语言</h3>
-        <p>专门的「学习」Tab：多语言词库，关卡递进解锁，生词一键进复习队列。</p>
+        <div class="ico">🖼️</div>
+        <h3>本地素材库</h3>
+        <p>链接本地目录（不导入媒体），递归索引图片 / 视频，仅本地使用。</p>
         <ul>
-          <li>日语 / 英语免费，韩语 / 法语 / 西语 PRO</li>
-          <li>从基础开始循序渐进，解锁更难卡片</li>
-          <li>读音 / 释义 / TTS 朗读全自动</li>
-          <li>学完自动排入复习，闭环到 SM-2</li>
+          <li>文件夹链接 + 用途批注（这张图是干嘛用的）</li>
+          <li>目录分组视图，网格 / 列表切换</li>
+          <li>视频就地播放，素材随时引用进收藏</li>
+          <li>素材不参与云同步——大文件只留在本机</li>
         </ul>
       </div>
       <div class="card fade">
-        <div class="ico">📈</div>
-        <h3>真实数据证明</h3>
-        <p>成长感来自真实复习记录，无法假装学会——曲线会说实话。</p>
+        <div class="ico">☁️</div>
+        <h3>数据带你走</h3>
+        <p>同步只走你自己的云盘，导出随时带走，服务器零存储。</p>
         <ul>
-          <li>遗忘曲线：个人正确率 vs 理论目标</li>
-          <li>掌握率、复习量、积压统计</li>
-          <li>状态从日志派生（投影原则）</li>
-          <li>一键导出 JSON，数据随时带走</li>
+          <li>WebDAV 通道：启动静默合并 + 前台周期同步</li>
+          <li>本机写入方（浏览器插件等）实时通知同步</li>
+          <li>删除墓碑防复活，删除跨端生效</li>
+          <li>一键导出 zip（JSON 机器可读），数据随时插拔</li>
         </ul>
       </div>
     </div>
@@ -316,18 +316,18 @@
   <div class="wrap">
     <div class="sec-head fade">
       <h2>一句话看懂它怎么工作</h2>
-      <p>收藏即承诺——我收藏的东西，会被拾忆替我记住。</p>
+      <p>收藏即入口——拾进来的内容，被 Glean 归置得明明白白。</p>
     </div>
     <div class="flow fade">
-      <div class="step"><div class="n">1</div><b>划词收藏</b><small>浏览器 / 手录 / 剪贴板</small></div>
+      <div class="step"><div class="n">1</div><b>拾进来</b><small>手录 / 剪贴板 / 分享</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">2</div><b>进分组</b><small>直接进对应分类</small></div>
+      <div class="step"><div class="n">2</div><b>自动标注</b><small>语言自动识别</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">3</div><b>云盘同步</b><small>WebDAV / iCloud，桌面秒级</small></div>
+      <div class="step"><div class="n">3</div><b>进分组</b><small>库 / 子集两级归类</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">4</div><b>复习</b><small>三键评级 · SM-2</small></div>
+      <div class="step"><div class="n">4</div><b>云盘同步</b><small>WebDAV，多端一致</small></div>
       <div class="arrow">→</div>
-      <div class="step"><div class="n">5</div><b>证明</b><small>曲线 / 掌握率</small></div>
+      <div class="step"><div class="n">5</div><b>带走</b><small>一键导出 / 随时归档</small></div>
     </div>
   </div>
 </section>
@@ -337,13 +337,13 @@
     <div class="privacy fade">
       <div>
         <h2>数据默认属于你</h2>
-        <p>拾忆把「拿不回数据」的担心当作首要设计约束：本地优先，隐私默认。</p>
-        <p>同步走进你自己的云盘（WebDAV / iCloud Drive），服务器永不存储你的任何数据与媒体文件——这是架构上的铁律，不是口头承诺。</p>
+        <p>Glean 把「拿不回数据」的担心当作首要设计约束：本地优先，隐私默认。</p>
+        <p>同步走进你自己的云盘（WebDAV），服务器永不存储你的任何数据与媒体文件——这是架构上的铁律，不是口头承诺。</p>
       </div>
       <div class="list">
-        <div>📦 收藏与复习数据默认仅保存在本机</div>
-        <div>📤 一键导出 JSON，随时插拔</div>
-        <div>🔄 云盘同步：数据只进你的 WebDAV / iCloud</div>
+        <div>📦 收藏与素材数据默认仅保存在本机</div>
+        <div>📤 一键导出 zip，随时插拔</div>
+        <div>🔄 云盘同步：数据只进你自己的 WebDAV</div>
         <div>🧹 可编辑、可删除、删了就是删了（删除跨端同步）</div>
       </div>
     </div>
@@ -359,16 +359,16 @@
     <div class="fade" style="overflow-x:auto;">
       <table>
         <tr><th>能力</th><th>状态</th><th>说明</th></tr>
-        <tr><td>分组即内容区（取消收件箱 / 记忆库聚合）</td><td><span class="tag now">已上线</span></td><td>收藏直接进工作 / 学习 / 未分类等分组，侧栏直达分组内容</td></tr>
-        <tr><td>浏览器划词收藏扩展</td><td><span class="tag now">已上线</span></td><td>右键直达分组，写入自有 WebDAV，桌面秒级出现</td></tr>
-        <tr><td>云盘同步（WebDAV / iCloud）</td><td><span class="tag now">已上线</span></td><td>多端合并、删除跨端同步；服务器 0 存储</td></tr>
-        <tr><td>SM-2 间隔重复 + 遗忘曲线</td><td><span class="tag now">已上线</span></td><td>三键评级、周视图正确率曲线</td></tr>
-        <tr><td>主动学习 · 多语言关卡</td><td><span class="tag now">已上线</span></td><td>日语 / 英语免费；韩语 / 法语 / 西语 PRO；TTS 朗读</td></tr>
+        <tr><td>收藏管道（手录 / 剪贴板 / 分享）</td><td><span class="tag now">已上线</span></td><td>收件箱 → 归类 → 归档，语言自动标注</td></tr>
+        <tr><td>分组体系（库 → 子集 + 标签）</td><td><span class="tag now">已上线</span></td><td>多对多归属、主库标记、搜索增强</td></tr>
+        <tr><td>本地素材库</td><td><span class="tag now">已上线</span></td><td>目录链接不导入，图片 / 视频索引</td></tr>
+        <tr><td>云盘同步（WebDAV）</td><td><span class="tag now">已上线</span></td><td>多端合并、删除跨端同步；服务器 0 存储</td></tr>
+        <tr><td>一键导出 zip</td><td><span class="tag now">已上线</span></td><td>JSON 机器可读 + 说明文件</td></tr>
         <tr><td>主题切换（跟随系统 / 浅色 / 深色）</td><td><span class="tag now">已上线</span></td><td>iOS HIG 风格，全端一致</td></tr>
-        <tr><td>OCR 拍照收藏 / 系统分享面板</td><td><span class="tag next">V1.1</span></td><td>拍照进管道，图片存为卡面</td></tr>
+        <tr><td>OCR 拍照收藏 / 系统分享面板</td><td><span class="tag next">V1.1</span></td><td>拍照进管道，图片存为素材</td></tr>
         <tr><td>Anki 导入导出</td><td><span class="tag next">V1.1</span></td><td>标准牌组互通，数据零锁定</td></tr>
-        <tr><td>FSRS 调度升级</td><td><span class="tag later">V2</span></td><td>数据积累后自动切换，间隔预测更精准</td></tr>
-        <tr><td>Windows / macOS 桌面端</td><td><span class="tag later">V2</span></td><td>全键盘复习，多端同一代码库</td></tr>
+        <tr><td>浏览器划词收藏扩展</td><td><span class="tag next">V1.1</span></td><td>browser-extension：选中即收藏，写入自有 WebDAV</td></tr>
+        <tr><td>Windows / macOS 桌面端</td><td><span class="tag later">V2</span></td><td>全键盘整理，多端同一代码库</td></tr>
       </table>
     </div>
   </div>
@@ -377,33 +377,33 @@
 <section class="alt" id="download">
   <div class="wrap">
     <div class="sec-head fade">
-      <h2>下载拾忆</h2>
+      <h2>下载 Glean</h2>
       <p>产物随每个 GitHub Release 自动构建发布。</p>
     </div>
     <div class="dl">
       <div class="card fade">
-        <div class="ico">🧩</div>
-        <h3>浏览器扩展</h3>
-        <p>Chrome / Edge（Manifest V3）：划词即收藏。</p>
-        <a class="btn" href="https://github.com/luskyle/shiyi/tree/main/browser-extension" target="_blank" rel="noopener">安装扩展</a>
-      </div>
-      <div class="card fade">
         <div class="ico">🤖</div>
         <h3>Android</h3>
         <p>APK 直接安装，即刻开始收藏。</p>
-        <a class="btn" href="https://github.com/luskyle/shiyi/releases" target="_blank" rel="noopener">下载 APK</a>
+        <a class="btn" href="https://github.com/luskyle/glean/releases" target="_blank" rel="noopener">下载 APK</a>
       </div>
       <div class="card fade">
         <div class="ico">🐧</div>
         <h3>Linux 桌面</h3>
         <p>解压即用，无需安装依赖。</p>
-        <a class="btn" href="https://github.com/luskyle/shiyi/releases" target="_blank" rel="noopener">下载 Linux 版</a>
+        <a class="btn" href="https://github.com/luskyle/glean/releases" target="_blank" rel="noopener">下载 Linux 版</a>
       </div>
       <div class="card fade">
         <div class="ico">🍎</div>
         <h3>iOS</h3>
         <p>跨平台同代码库，上架准备中。</p>
-        <a class="btn ghost" href="https://github.com/luskyle/shiyi" target="_blank" rel="noopener">敬请期待</a>
+        <a class="btn ghost" href="https://github.com/luskyle/glean" target="_blank" rel="noopener">敬请期待</a>
+      </div>
+      <div class="card fade">
+        <div class="ico">🧩</div>
+        <h3>浏览器扩展</h3>
+        <p>Manifest V3 划词收藏，V1.1 路线中。</p>
+        <a class="btn ghost" href="https://github.com/luskyle/glean/tree/main/browser-extension" target="_blank" rel="noopener">开发中</a>
       </div>
     </div>
   </div>
@@ -412,11 +412,11 @@
 <footer>
   <div class="wrap">
     <div class="links">
-      <a href="https://github.com/luskyle/shiyi" target="_blank" rel="noopener">GitHub 仓库</a>
-      <a href="https://github.com/luskyle/shiyi/releases" target="_blank" rel="noopener">Releases</a>
-      <a href="https://github.com/luskyle/shiyi/issues" target="_blank" rel="noopener">反馈</a>
+      <a href="https://github.com/luskyle/glean" target="_blank" rel="noopener">GitHub 仓库</a>
+      <a href="https://github.com/luskyle/glean/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/luskyle/glean/issues" target="_blank" rel="noopener">反馈</a>
     </div>
-    <div>拾忆 Shiyi —— 把你想记住的任何东西收进来。© 2026 · 本地优先，数据属于你。</div>
+    <div>Glean 收藏助手 —— 把散落的好内容拾进来。© 2026 · Apache-2.0 · 本地优先，数据属于你。</div>
   </div>
 </footer>
 

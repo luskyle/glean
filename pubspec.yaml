@@ -2,6 +2,7 @@ name: glean
 description: Glean 收藏助手 —— 把散落的好内容拾进来（收件箱 / 剪贴板 / 素材库）。
 publish_to: "none"
 version: 0.1.0+1
+license: Apache-2.0
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
