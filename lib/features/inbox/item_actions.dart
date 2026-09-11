@@ -176,10 +176,24 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
                 ),
               ),
             ],
-            // 浏览器选区 HTML 快照（只读渲染，flutter_html 不执行脚本）
+            // 浏览器选区 HTML 快照（只读渲染，flutter_widget 不执行脚本）
             if (item.htmlClip != null && item.htmlClip!.isNotEmpty) ...[
               const SizedBox(height: 12),
               _HtmlClipView(html: item.htmlClip!),
+            ],
+            // 离线页面标记（V2：整页离线归档，回看走「打开原文」）
+            if (item.mediaType == 'html' && item.mediaPath != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.save_alt, size: 16, color: scheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    '已离线保存整页（离线文件随云盘同步）',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ],
             const SizedBox(height: 16),
             TextField(
@@ -282,6 +296,7 @@ class _ItemDetailSheetState extends ConsumerState<ItemDetailSheet> {
       'video' => '视频',
       'audio' => '音频',
       'file' => '文件',
+      'html' => '离线页面',
       'manual' => '手动',
       'word' => '词条',
       'quote' => '语录',

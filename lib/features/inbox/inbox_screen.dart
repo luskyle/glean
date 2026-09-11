@@ -92,6 +92,7 @@ class InboxScreen extends ConsumerWidget {
       'video' => '视频',
       'audio' => '音频',
       'file' => '文件',
+      'html' => '离线页面',
       'manual' => '手动',
       'word' => '词条',
       'quote' => '语录',

@@ -124,6 +124,41 @@ document.getElementById('btnSettings').addEventListener('click', () => {
   $('settingsBox').open = !$('settingsBox').open;
 });
 
+// ---- 超体积确认（待处理时覆盖主表单）----
+(function initOversize() {
+  const KIND_LABEL = { image: '图片', video: '视频', audio: '音频', file: '文件' };
+  chrome.storage.local.get('pendingOversize', (st) => {
+    const p = st?.pendingOversize;
+    if (!p) return;
+    document.getElementById('mainBox').style.display = 'none';
+    document.getElementById('oversizeBox').style.display = 'block';
+    document.getElementById('oversizeInfo').textContent =
+      `${KIND_LABEL[p.kind] || '内容'}「${(p.pageTitle || p.srcUrl || '').slice(0, 40)}」` +
+      `超过 ${p.limitMb}MB。收藏源文件（上传到你的云盘）还是仅收藏链接？`;
+  });
+
+  function resolveOversize(action) {
+    chrome.runtime.sendMessage({ resolveOversize: action }, (r) => {
+      const m = $('msg');
+      m.textContent = r?.msg || (r?.ok ? '已收藏' : '收藏失败');
+      m.className = 'msg ' + (r?.ok ? 'ok' : 'err');
+      setTimeout(() => {
+        // 完成或失败都回到主表单
+        document.getElementById('oversizeBox').style.display = 'none';
+        document.getElementById('mainBox').style.display = 'block';
+      }, 1600);
+    });
+  }
+
+  document.getElementById('btnSaveFile').addEventListener('click', () => resolveOversize('file'));
+  document.getElementById('btnSaveLink').addEventListener('click', () => resolveOversize('link'));
+  document.getElementById('btnCancelOversize').addEventListener('click', () => {
+    chrome.storage.local.remove('pendingOversize');
+    document.getElementById('oversizeBox').style.display = 'none';
+    document.getElementById('mainBox').style.display = 'block';
+  });
+})();
+
 (async () => {
   await loadSettings();
   await refreshCollections();

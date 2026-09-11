@@ -11,6 +11,7 @@
   }
   h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
   h1 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue); }
+  h2 { font-size: 15px; margin-bottom: 6px; }
   .field { margin-top: 12px; }
   label { font-size: 12px; color: var(--ink2); display: block; margin-bottom: 4px; }
   textarea, select, input {
@@ -31,44 +32,62 @@
   details { margin-top: 12px; }
   summary { font-size: 12px; color: var(--ink2); cursor: pointer; }
   .tiny { font-size: 11px; color: var(--ink2); margin-top: 6px; }
+  .oversize-note { font-size: 12px; color: var(--ink2); margin: 8px 0 4px; line-height: 1.6; }
+  .oversize-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .oversize-actions button { width: 100%; }
 </style>
 </head>
 <body>
-  <h1><span class="dot"></span>Glean · 划词收藏</h1>
+  <!-- 主表单（默认） -->
+  <div id="mainBox">
+    <h1><span class="dot"></span>Glean · 划词收藏</h1>
 
-  <div class="field">
-    <label>要收藏的内容（划选后自动带入）</label>
-    <textarea id="text" placeholder="单词、句子、灵感…（自动推断语言，进收件箱）"></textarea>
+    <div class="field">
+      <label>要收藏的内容（划选后自动带入）</label>
+      <textarea id="text" placeholder="单词、句子、灵感…（自动推断语言，进收件箱）"></textarea>
+    </div>
+
+    <input type="hidden" id="pageUrl" />
+    <input type="hidden" id="pageTitle" />
+    <div class="tiny" id="sourceLine" style="display:none;"></div>
+
+    <div class="row">
+      <select id="collection"><option value="">未分类</option></select>
+      <button class="ghost" id="btnSettings">设置</button>
+      <button class="primary" id="btnSave">收藏</button>
+    </div>
+
+    <details id="settingsBox">
+      <summary>WebDAV 设置（坚果云等）</summary>
+      <div class="field">
+        <label>地址</label>
+        <input id="davUrl" placeholder="https://dav.jianguoyun.com/dav/" />
+      </div>
+      <div class="field">
+        <label>账号</label>
+        <input id="davUser" placeholder="坚果云账号" />
+      </div>
+      <div class="field">
+        <label>应用密码</label>
+        <input id="davPass" type="password" placeholder="坚果云「安全选项→应用密码」" />
+      </div>
+      <button class="primary" id="btnSaveCfg" style="margin-top:10px;">保存设置并刷新分类</button>
+      <p class="tiny">收藏数据写入你的私人云盘（glean/backup.json），服务器零存储；桌面/移动端打开 Glean 自动合并进收件箱。</p>
+    </details>
   </div>
 
-  <input type="hidden" id="pageUrl" />
-  <input type="hidden" id="pageTitle" />
-  <div class="tiny" id="sourceLine" style="display:none;"></div>
-
-  <div class="row">
-    <select id="collection"><option value="">未分类</option></select>
-    <button class="ghost" id="btnSettings">设置</button>
-    <button class="primary" id="btnSave">收藏</button>
+  <!-- 超体积确认（待处理时覆盖主表单） -->
+  <div id="oversizeBox" style="display:none;">
+    <h2>内容超过大小限制</h2>
+    <p class="oversize-note" id="oversizeInfo"></p>
+    <div class="oversize-actions">
+      <button class="primary" id="btnSaveFile">收藏源文件（上传到云盘）</button>
+      <button class="ghost" id="btnSaveLink">仅收藏链接</button>
+      <button class="ghost" id="btnCancelOversize">取消</button>
+    </div>
   </div>
+
   <div class="msg" id="msg"></div>
-
-  <details id="settingsBox">
-    <summary>WebDAV 设置（坚果云等）</summary>
-    <div class="field">
-      <label>地址</label>
-      <input id="davUrl" placeholder="https://dav.jianguoyun.com/dav/" />
-    </div>
-    <div class="field">
-      <label>账号</label>
-      <input id="davUser" placeholder="坚果云账号" />
-    </div>
-    <div class="field">
-      <label>应用密码</label>
-      <input id="davPass" type="password" placeholder="坚果云「安全选项→应用密码」" />
-    </div>
-    <button class="primary" id="btnSaveCfg" style="margin-top:10px;">保存设置并刷新分类</button>
-    <p class="tiny">收藏数据写入你的私人云盘（glean/backup.json），服务器零存储；桌面/移动端打开 Glean 自动合并进收件箱。</p>
-  </details>
 
   <script src="snapshot.js"></script>
   <script src="popup.js"></script>

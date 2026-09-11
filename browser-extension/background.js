@@ -23,6 +23,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     rebuildMenus().then(sendResponse);
     return true;
   }
+  if (msg && msg.resolveOversize) {
+    resolveOversize(msg.action).then(sendResponse);
+    return true;
+  }
 });
 
 /** 重建完整菜单（整树）：此刻菜单未在显示中，removeAll 安全。 */
@@ -62,6 +66,12 @@ async function rebuildMenus() {
       id: 'glean-save-file',
       title: '链接文件收藏到 Glean',
       contexts: ['link'],
+    });
+    // V2：整页离线归档（单文件 HTML，静态资源尽力内联）
+    chrome.contextMenus.create({
+      id: 'glean-offline-page',
+      title: '整页离线收藏到 Glean',
+      contexts: ['page'],
     });
     // 云端分类直达：划词收藏到分类 / 网页收藏到分类 两组
     (async () => {
@@ -129,6 +139,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'glean-save-image') {
     const imgUrl = info.srcUrl || '';
     const r = await saveImageWith(imgUrl, url, title, null);
+    if (r.pending) return; // 超过体积：弹窗询问中
     notify(r.ok ? r.msg : (r.msg || '收藏失败：请先在弹窗配置 WebDAV'), r.ok);
     return;
   }
@@ -138,6 +149,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const srcUrl = info.srcUrl || '';
     const mediaType = info.mediaType === 'audio' ? 'audio' : 'video';
     const r = await saveMediaWith(srcUrl, mediaType, url, title, null);
+    if (r.pending) return; // 超过体积：弹窗询问中
     notify(r.ok ? r.msg : (r.msg || '收藏失败：请先在弹窗配置 WebDAV'), r.ok);
     return;
   }
@@ -145,6 +157,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // ---- 链接文件收藏（右键链接 → 可下载文件直传，网页链接引导收藏网页）----
   if (info.menuItemId === 'glean-save-file') {
     const r = await saveFileWith(info.linkUrl || '', url, title, null);
+    if (r.pending) return; // 超过体积：弹窗询问中
+    notify(r.ok ? r.msg : (r.msg || '收藏失败：请先在弹窗配置 WebDAV'), r.ok);
+    return;
+  }
+
+  // ---- 整页离线收藏（V2：单文件 HTML + 静态资源内联）----
+  if (info.menuItemId === 'glean-offline-page') {
+    const r = await savePageOffline(url, title, null);
     notify(r.ok ? r.msg : (r.msg || '收藏失败：请先在弹窗配置 WebDAV'), r.ok);
     return;
   }
@@ -236,6 +256,13 @@ async function saveImageWith(imgUrl, pageUrl, pageTitle, collectionId) {
 
     // 尽力下载原图（跨域/防盗链失败 → mediaPath=null，仅留引用）
     const dl = await downloadMedia(cfg, imgUrl, MEDIA_MAX_BYTES);
+    if (dl.skipped === 'too-large') {
+      // 超过体积：打开弹窗询问「收藏源文件 / 仅收藏链接」
+      await askOversize('image', {
+        srcUrl: imgUrl, pageUrl, pageTitle, collectionId, limitMb: 50,
+      });
+      return { ok: false, pending: true };
+    }
 
     appendItem(snap, pageTitle || imgUrl, {
       url: imgUrl,
@@ -248,9 +275,7 @@ async function saveImageWith(imgUrl, pageUrl, pageTitle, collectionId) {
     await davPut(cfg, snap); // davPut 内部会 pingDesktop
     return {
       ok: true,
-      msg: dl.path
-        ? '已收藏图片'
-        : (dl.skipped === 'too-large' ? '已收藏图片（>50MB 未下载原图）' : '已收藏图片（原图未下载）'),
+      msg: dl.path ? '已收藏图片' : '已收藏图片（原图未下载）',
     };
   } catch (e) {
     console.error('glean image save failed', e);
@@ -271,6 +296,12 @@ async function saveMediaWith(srcUrl, mediaType, pageUrl, pageTitle, collectionId
 
     const meta = await fetchPageMeta(pageUrl); // og:image 封面（尽力）
     const dl = await downloadMedia(cfg, srcUrl, MEDIA_MAX_BYTES);
+    if (dl.skipped === 'too-large') {
+      await askOversize(mediaType, {
+        srcUrl, pageUrl, pageTitle, collectionId, limitMb: 50,
+      });
+      return { ok: false, pending: true };
+    }
 
     appendItem(snap, pageTitle || srcUrl, {
       url: srcUrl,
@@ -285,9 +316,7 @@ async function saveMediaWith(srcUrl, mediaType, pageUrl, pageTitle, collectionId
     const label = mediaType === 'audio' ? '音频' : '视频';
     return {
       ok: true,
-      msg: dl.path
-        ? `已收藏${label}`
-        : (dl.skipped === 'too-large' ? `已收藏${label}（>50MB 未下载）` : `已收藏${label}（仅引用）`),
+      msg: dl.path ? `已收藏${label}` : `已收藏${label}（仅引用）`,
     };
   } catch (e) {
     console.error('glean media save failed', e);
@@ -311,13 +340,14 @@ async function saveFileWith(linkUrl, pageUrl, pageTitle, collectionId) {
     if (dl.skipped === 'not-file') {
       return { ok: false, msg: '该链接是网页，请用「网页收藏」' };
     }
+    if (dl.skipped === 'too-large') {
+      await askOversize('file', {
+        srcUrl: linkUrl, pageUrl, pageTitle, collectionId, limitMb: 100,
+      });
+      return { ok: false, pending: true };
+    }
     if (!dl.path) {
-      return {
-        ok: true,
-        msg: dl.skipped === 'too-large'
-          ? '已收藏文件（>100MB 未下载）'
-          : '已收藏文件（仅引用）',
-      };
+      return { ok: true, msg: '已收藏文件（仅引用）' };
     }
 
     appendItem(snap, pageTitle || linkUrl, {
@@ -339,6 +369,8 @@ async function saveFileWith(linkUrl, pageUrl, pageTitle, collectionId) {
 /** 媒体/文件下载上限（防网盘配额与 SW 内存爆掉）。 */
 const MEDIA_MAX_BYTES = 50 * 1024 * 1024; // 视频/音频
 const FILE_MAX_BYTES = 100 * 1024 * 1024; // 普通文件
+// 用户确认「收藏源文件」后的绝对保护上限（防超大文件拖垮 SW）
+const OVERSIZE_HARD_MAX = 500 * 1024 * 1024;
 
 /**
  * 尝试下载资源到媒体库。
@@ -373,6 +405,204 @@ function guessExtFromUrl(u) {
   } catch (_) {
     return 'bin';
   }
+}
+
+/**
+ * 超体积询问：右键流程（contextMenus.onClicked）无法弹对话框，
+ * 把待确认收藏存入 storage 并打开弹窗作为确认界面。
+ * 用户选择经 resolveOversize 继续执行（收藏源文件 / 仅收藏链接）。
+ */
+async function askOversize(kind, info) {
+  await chrome.storage.local.set({ pendingOversize: { kind, ...info } });
+  try {
+    await chrome.action.openPopup();
+  } catch (_) {}
+}
+
+/** 处理弹窗确认结果。action: 'file' 收藏源文件（突破常规阈值）| 'link' 仅收藏链接。 */
+async function resolveOversize(action) {
+  try {
+    const st = await chrome.storage.local.get('pendingOversize');
+    const p = st?.pendingOversize;
+    if (!p) return { ok: false, msg: '没有待处理的收藏' };
+    await chrome.storage.local.remove('pendingOversize');
+
+    const cfg = await loadConfig();
+    if (!cfg.url) return { ok: false, msg: '请先在弹窗配置 WebDAV' };
+    const snap = (await davGet(cfg)) || emptySnapshot();
+    if (!snap.rows) snap.rows = {};
+
+    let mediaPath = null;
+    if (action === 'file') {
+      // 用户确认后仍保留绝对保护上限（防超大文件拖垮 SW）
+      const dl = await downloadMedia(cfg, p.srcUrl, OVERSIZE_HARD_MAX);
+      mediaPath = dl.path;
+      if (!mediaPath && dl.skipped === 'too-large') {
+        return { ok: false, msg: '文件超过 500MB，已取消上传（可仅收藏链接）' };
+      }
+    }
+
+    appendItem(snap, p.pageTitle || p.srcUrl, {
+      url: p.srcUrl,
+      title: p.pageTitle,
+      collectionId: p.collectionId,
+      mediaType: p.kind,
+      mediaPath,
+      source: p.kind,
+    });
+    await davPut(cfg, snap); // davPut 内部会 pingDesktop
+    return { ok: true, msg: mediaPath ? '已收藏源文件' : '已收藏（仅链接）' };
+  } catch (e) {
+    console.error('resolve oversize failed', e);
+    return { ok: false, msg: '收藏失败' };
+  }
+}
+
+/** 离线归档限额（防网盘配额与 SW 内存/生命周期爆掉）。 */
+const OFFLINE_RES_MAX = 40; // 最多内联资源数
+const OFFLINE_ASSET_MAX = 4 * 1024 * 1024; // 单个资源 ≤ 4MB
+const OFFLINE_TOTAL_MAX = 15 * 1024 * 1024; // 总内联 ≤ 15MB
+const OFFLINE_HTML_MAX = 8 * 1024 * 1024; // 页面 HTML ≤ 8MB
+
+/**
+ * 整页离线收藏：抓取页面 HTML，把 img / video poster / source 静态资源
+ * 下载并以 base64 内联进单文件 HTML → 上传到媒体库（/glean/media/<id>.html）。
+ * 任何失败静默降级为「网页元数据收藏」（引用兜底，收藏动作永不失败）。
+ */
+async function savePageOffline(url, title, collectionId) {
+  if (!/^https?:\/\//i.test(url || '')) return { ok: false };
+  try {
+    const cfg = await loadConfig();
+    if (!cfg.url) return { ok: false };
+    const snap = (await davGet(cfg)) || emptySnapshot();
+    if (!snap.rows) snap.rows = {};
+
+    let offlinePath = null;
+    let msg = '已收藏离线页面';
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const len = Number(res.headers.get('content-length') || 0);
+        const htmlText = await res.text();
+        if (htmlText.length <= OFFLINE_HTML_MAX && (len === 0 || len <= OFFLINE_HTML_MAX)) {
+          const inlined = await inlinePageResources(htmlText, url);
+          const blob = new Blob([inlined], { type: 'text/html' });
+          offlinePath = await davPutBinary(cfg, blob, 'html');
+          if (!offlinePath) {
+            msg = '离线页面上传失败，已收藏链接';
+          }
+        } else {
+          msg = '页面过大，已收藏链接';
+        }
+      } else {
+        msg = '页面抓取失败，已收藏链接';
+      }
+    } catch (_) {
+      msg = '页面抓取失败，已收藏链接';
+    }
+
+    const meta = await fetchPageMeta(url);
+    appendItem(snap, title || url, {
+      url,
+      title,
+      collectionId,
+      note: meta?.description || null,
+      coverUrl: meta?.coverUrl || null,
+      mediaType: offlinePath ? 'html' : null,
+      mediaPath: offlinePath,
+      source: 'html',
+    });
+    await davPut(cfg, snap); // davPut 内部会 pingDesktop
+    return { ok: true, msg };
+  } catch (e) {
+    console.error('glean offline save failed', e);
+    return { ok: false };
+  }
+}
+
+/**
+ * 把页面 HTML 中的静态资源（img / video poster / source）下载并以
+ * data URI 内联。stylesheets/scripts 保留原引用（离线打开时静默降级）。
+ */
+async function inlinePageResources(html, baseUrl) {
+  let used = 0;
+  let count = 0;
+  const cache = new Map(); // 绝对 URL -> data URI
+
+  const toAbsolute = (u) => {
+    try {
+      return new URL(u, baseUrl).href;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  // 收集候选资源（去重）
+  const needs = new Set();
+  const collect = (re, group) => {
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      const abs = toAbsolute(m[group]);
+      if (abs && /^https:/i.test(abs)) needs.add(abs);
+    }
+  };
+  collect(/<img\s[^>]*?src=["']([^"']+)["']/gi, 1);
+  collect(/<video[^>]*?poster=["']([^"']+)["']/gi, 1);
+  collect(/<source[^>]*?src=["']([^"']+)["']/gi, 1);
+
+  // 逐个下载内联（限额内尽力而为）
+  for (const abs of needs) {
+    if (count >= OFFLINE_RES_MAX || used >= OFFLINE_TOTAL_MAX) break;
+    try {
+      const res = await fetch(abs, { cache: 'no-store' });
+      if (!res.ok) continue;
+      const len = Number(res.headers.get('content-length') || 0);
+      if (len > OFFLINE_ASSET_MAX) continue;
+      const blob = await res.blob();
+      if (blob.size > OFFLINE_ASSET_MAX) continue;
+      if (used + blob.size > OFFLINE_TOTAL_MAX) continue;
+      const b64 = await blobToBase64(blob);
+      used += blob.size;
+      count += 1;
+      cache.set(abs, `data:${blob.type || 'application/octet-stream'};base64,${b64}`);
+    } catch (_) {}
+  }
+
+  // 同步替换（cache 内命中才替换，失败资源保留原引用降级）
+  html = html.replace(
+    /(<img\s[^>]*?src=["'])([^"']+)(["'][^>]*?>)/gi,
+    (m, pre, src, post) => {
+      const abs = toAbsolute(src);
+      const d = abs ? cache.get(abs) : null;
+      return d ? `${pre}${d}${post}` : m;
+    },
+  );
+  html = html.replace(
+    /(<video[^>]*?poster=["'])([^"']+)(["'][^>]*?>)/gi,
+    (m, pre, poster, post) => {
+      const abs = toAbsolute(poster);
+      const d = abs ? cache.get(abs) : null;
+      return d ? `${pre}${d}${post}` : m;
+    },
+  );
+  html = html.replace(
+    /(<source[^>]*?src=["'])([^"']+)(["'][^>]*?\/?>)/gi,
+    (m, pre, src, post) => {
+      const abs = toAbsolute(src);
+      const d = abs ? cache.get(abs) : null;
+      return d ? `${pre}${d}${post}` : m;
+    },
+  );
+  return html;
+}
+
+/** blob 转 base64（SW 环境：arrayBuffer + btoa，不依赖 FileReader）。 */
+async function blobToBase64(blob) {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
 }
 
 function emptySnapshot() {
